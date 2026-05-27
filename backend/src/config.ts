@@ -8,4 +8,8 @@ export const config = {
     process.env.DATABASE_URL ??
     'postgresql://multstudio:multstudio_dev_password@127.0.0.1:5432/multstudio',
   redisUrl: process.env.REDIS_URL ?? 'redis://127.0.0.1:6379',
+  openaiApiKey: process.env.OPENAI_API_KEY ?? '',
+  openaiImageModel: process.env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1.5',
+  openaiImageSize: process.env.OPENAI_IMAGE_SIZE ?? '1536x1024',
+  openaiImageQuality: process.env.OPENAI_IMAGE_QUALITY ?? 'medium',
 }

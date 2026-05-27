@@ -548,6 +548,14 @@ button {
   overflow: hidden;
 }
 
+.scene-preview img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .scene-preview::before {
   content: '';
   position: absolute;
@@ -570,6 +578,20 @@ button {
   border-radius: 8px;
   background: rgba(17, 24, 39, 0.82);
   color: white;
+}
+
+.scene-status {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  z-index: 2;
+  padding: 5px 7px;
+  border-radius: 7px;
+  background: rgba(17, 24, 39, 0.82);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 820;
+  text-transform: uppercase;
 }
 
 .scene-character {

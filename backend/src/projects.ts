@@ -98,7 +98,7 @@ export async function getProject(projectId: string) {
     ),
     db.query(
       `
-        select id, title, prompt, gradient, sort_order
+        select id, title, prompt, gradient, image_url, image_provider, image_status, sort_order
         from scenes
         where project_id = $1
         order by sort_order asc
@@ -120,6 +120,42 @@ export async function getProject(projectId: string) {
     stages: stagesResult.rows,
     scenes: scenesResult.rows,
   }
+}
+
+export async function listScenesForProject(projectId: string) {
+  const result = await db.query<{
+    id: string
+    title: string
+    prompt: string
+    gradient: string
+    image_url: string | null
+  }>(
+    `
+      select id, title, prompt, gradient, image_url
+      from scenes
+      where project_id = $1
+      order by sort_order asc
+    `,
+    [projectId],
+  )
+
+  return result.rows
+}
+
+export async function updateSceneImage(
+  sceneId: string,
+  imageUrl: string | null,
+  imageProvider: string | null,
+  imageStatus: string,
+) {
+  await db.query(
+    `
+      update scenes
+      set image_url = $2, image_provider = $3, image_status = $4
+      where id = $1
+    `,
+    [sceneId, imageUrl, imageProvider, imageStatus],
+  )
 }
 
 export async function updateProjectStatus(projectId: string, status: string) {

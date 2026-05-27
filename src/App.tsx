@@ -48,6 +48,8 @@ type Scene = {
   title: string
   prompt: string
   gradient: string
+  image_url?: string | null
+  image_status?: string
 }
 
 type Project = {
@@ -368,9 +370,14 @@ function App() {
             {scenes.map((scene, index) => (
               <article className="scene-card" key={`${scene.title}-${index}`}>
                 <div className={`scene-preview ${scene.gradient}`}>
-                  <div className="scene-character">
-                    <Sparkles size={24} />
-                  </div>
+                  {scene.image_url ? (
+                    <img src={scene.image_url} alt={scene.title} />
+                  ) : (
+                    <div className="scene-character">
+                      <Sparkles size={24} />
+                    </div>
+                  )}
+                  {scene.image_status === 'generating' ? <span className="scene-status">OpenAI</span> : null}
                   <button aria-label="Предпросмотр сцены">
                     <Play size={18} fill="currentColor" />
                   </button>
