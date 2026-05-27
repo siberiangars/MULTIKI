@@ -3,6 +3,13 @@ dist
 dist-backend
 .git
 .playwright-mcp
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p8
+secrets
 npm-debug.log*
 Dockerfile
 docker-compose.yml
