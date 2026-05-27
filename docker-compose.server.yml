@@ -5,11 +5,12 @@ services:
       dockerfile: Dockerfile
     container_name: multstudio-web
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:8083:80"
     depends_on:
       - postgres
       - redis
+    networks:
+      - default
+      - caddy-shared
 
   postgres:
     image: postgres:17-alpine
@@ -33,3 +34,8 @@ services:
 volumes:
   postgres-data:
   redis-data:
+
+networks:
+  caddy-shared:
+    external: true
+    name: shorts-factory_external
