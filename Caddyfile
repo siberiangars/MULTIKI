@@ -1,0 +1,5 @@
+multiki.v3techbots.online {
+  encode zstd gzip
+
+  reverse_proxy web:80
+}
