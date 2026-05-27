@@ -1,0 +1,38 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: multstudio-web
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:18-alpine
+    container_name: multstudio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: multstudio
+      POSTGRES_USER: multstudio
+      POSTGRES_PASSWORD: multstudio_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:8-alpine
+    container_name: multstudio-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+
+volumes:
+  postgres-data:
+  redis-data:

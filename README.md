@@ -1,73 +1,48 @@
-# React + TypeScript + Vite
+# МультСтудия AI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+MVP сервиса для генерации персональных AI-мультфильмов по фото ребенка и текстовому брифу клиента.
 
-Currently, two official plugins are available:
+## Что есть сейчас
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React + Vite + TypeScript frontend.
+- Рабочий экран production console: фото, сценарный бриф, этапы генерации, раскадровка, тарифы.
+- Локальная симуляция генерационного пайплайна.
+- Production Docker image через nginx.
+- Docker Compose с заготовкой под `web`, `postgres`, `redis`.
 
-## React Compiler
+## Локальный запуск
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Приложение откроется на `http://127.0.0.1:5173`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Проверки
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run lint
+npm run build
 ```
+
+## Docker
+
+```bash
+docker compose up --build
+```
+
+Frontend будет доступен на `http://127.0.0.1:8080`.
+
+Сервисы разработки:
+
+- Postgres: `localhost:5432`
+- Redis: `localhost:6379`
+
+## Следующий этап
+
+1. Добавить backend API.
+2. Подключить PostgreSQL-схему проектов, пользователей, сцен и assets.
+3. Добавить Redis/BullMQ очередь генерации.
+4. Интегрировать AI-провайдеры: сценарий, image generation, image-to-video, TTS.
+5. Собрать финальный MP4 через FFmpeg или Remotion.
