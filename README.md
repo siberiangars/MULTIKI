@@ -1,23 +1,32 @@
 # МультСтудия AI
 
-MVP сервиса для генерации персональных AI-мультфильмов по фото ребенка и текстовому брифу клиента.
+Full-stack MVP сервиса для генерации персональных AI-мультфильмов по фото ребенка и текстовому брифу клиента.
 
 ## Что есть сейчас
 
 - React + Vite + TypeScript frontend.
-- Рабочий экран production console: фото, сценарный бриф, этапы генерации, раскадровка, тарифы.
-- Локальная симуляция генерационного пайплайна.
-- Production Docker image через nginx.
-- Docker Compose с заготовкой под `web`, `postgres`, `redis`.
+- Fastify API на Node.js.
+- PostgreSQL для проектов, сцен и этапов производства.
+- Redis + BullMQ worker для очереди генерации.
+- Docker Compose для локального и серверного запуска.
+- Nginx для web-контейнера и прокси `/api` в backend.
+- Production-деплой на `multiki.v3techbots.online` через общий Caddy.
 
-## Локальный запуск
+## Локальный запуск без Docker
 
 ```bash
 npm install
 npm run dev
 ```
 
-Приложение откроется на `http://127.0.0.1:5173`.
+Отдельно можно запускать backend:
+
+```bash
+npm run dev:api
+npm run dev:worker
+```
+
+Vite проксирует `/api` и `/health` на `http://127.0.0.1:4000`.
 
 ## Проверки
 
@@ -29,13 +38,14 @@ npm run build
 ## Docker
 
 ```bash
-docker compose up --build
+docker compose up --build -d
 ```
 
-Frontend будет доступен на `http://127.0.0.1:8080`.
+Сервисы:
 
-Сервисы разработки:
-
+- Frontend: `http://127.0.0.1:8080`
+- API: `http://127.0.0.1:4000`
+- Health: `http://127.0.0.1:8080/health`
 - Postgres: `localhost:5432`
 - Redis: `localhost:6379`
 
@@ -43,7 +53,7 @@ Frontend будет доступен на `http://127.0.0.1:8080`.
 
 Целевой поддомен: `multiki.v3techbots.online`.
 
-В панели Reg.ru добавьте DNS-запись:
+DNS в Reg.ru:
 
 ```text
 Тип: A
@@ -52,33 +62,43 @@ Frontend будет доступен на `http://127.0.0.1:8080`.
 TTL: 300
 ```
 
-После обновления DNS запустите production-compose на сервере:
+На чистом сервере:
 
 ```bash
 docker compose -p multstudio -f docker-compose.prod.yml up --build -d
 ```
 
-Caddy примет трафик на `80/443`, автоматически выпустит HTTPS-сертификат и прокинет запросы в контейнер `web`.
-
-Если на сервере уже есть общий Caddy в Docker-сети `shorts-factory_web`, используйте compose без собственного Caddy:
+На текущем сервере, где уже есть общий Caddy в Docker-сети `shorts-factory_web`:
 
 ```bash
 docker compose -p multstudio -f docker-compose.server.yml up --build -d
 ```
 
-И добавьте в общий Caddyfile:
+Блок в общем Caddyfile:
 
 ```caddy
 multiki.v3techbots.online {
   encode zstd gzip
-  reverse_proxy multstudio-web:80
+
+  handle /api/* {
+    reverse_proxy multstudio-api:4000
+  }
+
+  handle /health {
+    reverse_proxy multstudio-api:4000
+  }
+
+  handle {
+    reverse_proxy multstudio-web:80
+  }
 }
 ```
 
 ## Следующий этап
 
-1. Добавить backend API.
-2. Подключить PostgreSQL-схему проектов, пользователей, сцен и assets.
-3. Добавить Redis/BullMQ очередь генерации.
-4. Интегрировать AI-провайдеры: сценарий, image generation, image-to-video, TTS.
-5. Собрать финальный MP4 через FFmpeg или Remotion.
+1. Добавить авторизацию и личные кабинеты.
+2. Добавить загрузку фото в object storage.
+3. Подключить LLM для продюсерского сценария.
+4. Подключить image generation и image-to-video провайдеров.
+5. Подключить TTS и сборку MP4 через FFmpeg/Remotion.
+6. Добавить оплату и лимиты подписки.

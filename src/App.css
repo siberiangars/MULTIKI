@@ -157,6 +157,32 @@
   justify-content: flex-end;
 }
 
+.api-status {
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.api-status.online {
+  background: #edf9df;
+  color: #5d8614;
+}
+
+.api-status.offline {
+  background: #fff2ee;
+  color: #c2472f;
+}
+
+.api-status.connecting {
+  background: #edf7fb;
+  color: #087a91;
+}
+
 button {
   font: inherit;
 }
@@ -179,6 +205,11 @@ button {
   font-size: 13px;
   font-weight: 760;
   box-shadow: 0 10px 22px rgba(255, 112, 88, 0.26);
+}
+
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
 }
 
 .secondary-button {

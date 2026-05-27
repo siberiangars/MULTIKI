@@ -17,11 +17,46 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: web
     container_name: multstudio-web
     restart: unless-stopped
     depends_on:
-      - postgres
-      - redis
+      - api
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+    container_name: multstudio-api
+    restart: unless-stopped
+    command: ["node", "dist-backend/server.js"]
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgresql://multstudio:multstudio_dev_password@postgres:5432/multstudio
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+    container_name: multstudio-worker
+    restart: unless-stopped
+    command: ["node", "dist-backend/worker.js"]
+    environment:
+      DATABASE_URL: postgresql://multstudio:multstudio_dev_password@postgres:5432/multstudio
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   postgres:
     image: postgres:17-alpine
@@ -33,6 +68,11 @@ services:
       POSTGRES_PASSWORD: multstudio_dev_password
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U multstudio -d multstudio"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   redis:
     image: redis:8-alpine
@@ -41,6 +81,11 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
 volumes:
   caddy-data:

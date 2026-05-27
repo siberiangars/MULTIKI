@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   BadgeCheck,
   CalendarClock,
@@ -27,6 +27,7 @@ import './App.css'
 type StageStatus = 'done' | 'active' | 'queued'
 
 type Stage = {
+  slug: string
   title: string
   detail: string
   progress: number
@@ -42,24 +43,43 @@ type Brief = {
   duration: string
 }
 
-const baseStages: Stage[] = [
-  { title: 'Сценарий', detail: '12 сцен, арка героя', progress: 100, status: 'done' },
-  { title: 'Образ героя', detail: 'единый character sheet', progress: 76, status: 'active' },
-  { title: 'Кадры', detail: '3D ключевые сцены', progress: 42, status: 'active' },
-  { title: 'Анимация', detail: 'image-to-video клипы', progress: 18, status: 'queued' },
-  { title: 'Озвучка', detail: 'диктор, эмоции, паузы', progress: 0, status: 'queued' },
-  { title: 'Монтаж', detail: 'музыка, титры, MP4', progress: 0, status: 'queued' },
+type Scene = {
+  id?: string
+  title: string
+  prompt: string
+  gradient: string
+}
+
+type Project = {
+  id: string
+  status: string
+  script: string
+  brief: Brief
+  stages: Stage[]
+  scenes: Scene[]
+}
+
+const apiBase = import.meta.env.VITE_API_URL ?? ''
+
+const seedBrief: Brief = {
+  name: 'Лева',
+  age: '6',
+  occasion: 'день рождения',
+  world: 'космическое приключение',
+  tone: 'добрый, смешной, вдохновляющий',
+  duration: '60 секунд',
+}
+
+const fallbackStages: Stage[] = [
+  { slug: 'script', title: 'Сценарий', detail: '12 сцен, арка героя', progress: 100, status: 'done' },
+  { slug: 'character', title: 'Образ героя', detail: 'единый character sheet', progress: 76, status: 'active' },
+  { slug: 'frames', title: 'Кадры', detail: '3D ключевые сцены', progress: 42, status: 'active' },
+  { slug: 'animation', title: 'Анимация', detail: 'image-to-video клипы', progress: 18, status: 'queued' },
+  { slug: 'voice', title: 'Озвучка', detail: 'диктор, эмоции, паузы', progress: 0, status: 'queued' },
+  { slug: 'edit', title: 'Монтаж', detail: 'музыка, титры, MP4', progress: 0, status: 'queued' },
 ]
 
-const nav = [
-  { label: 'Проекты', icon: Clapperboard, active: false },
-  { label: 'Новый мультфильм', icon: Wand2, active: true },
-  { label: 'Персонажи', icon: UserRound, active: false },
-  { label: 'Тарифы', icon: CreditCard, active: false },
-  { label: 'Настройки', icon: Settings, active: false },
-]
-
-const scenes = [
+const fallbackScenes: Scene[] = [
   {
     title: 'Знакомство с героем',
     prompt: 'Лева находит светящийся билет в домашней комнате',
@@ -82,56 +102,133 @@ const scenes = [
   },
 ]
 
-const plans = [
-  {
-    name: 'Старт',
-    price: '5 000 ₽',
-    note: '2 ролика до 45 сек',
-    margin: 'маржа 45-60%',
-  },
-  {
-    name: 'Студия',
-    price: '9 900 ₽',
-    note: '5 роликов или 2 длинных',
-    margin: 'приоритетная очередь',
-  },
-  {
-    name: 'Премиум',
-    price: '19 900 ₽',
-    note: 'ручная режиссура и 3 правки',
-    margin: 'для подарков и B2B',
-  },
+const nav = [
+  { label: 'Проекты', icon: Clapperboard, active: false },
+  { label: 'Новый мультфильм', icon: Wand2, active: true },
+  { label: 'Персонажи', icon: UserRound, active: false },
+  { label: 'Тарифы', icon: CreditCard, active: false },
+  { label: 'Настройки', icon: Settings, active: false },
 ]
 
-const initialBrief: Brief = {
-  name: 'Лева',
-  age: '6',
-  occasion: 'день рождения',
-  world: 'космическое приключение',
-  tone: 'добрый, смешной, вдохновляющий',
-  duration: '60 секунд',
-}
+const plans = [
+  { name: 'Старт', price: '5 000 ₽', note: '2 ролика до 45 сек', margin: 'маржа 45-60%' },
+  { name: 'Студия', price: '9 900 ₽', note: '5 роликов или 2 длинных', margin: 'приоритетная очередь' },
+  { name: 'Премиум', price: '19 900 ₽', note: 'ручная режиссура и 3 правки', margin: 'для подарков и B2B' },
+]
 
 function App() {
-  const [brief, setBrief] = useState(initialBrief)
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [brief, setBrief] = useState(seedBrief)
+  const [project, setProject] = useState<Project | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const [revisionCount, setRevisionCount] = useState(1)
+  const [apiState, setApiState] = useState<'connecting' | 'online' | 'offline'>('connecting')
 
-  const stages = useMemo(() => {
-    if (!isGenerating) return baseStages
+  const stages = project?.stages ?? fallbackStages
+  const scenes = project?.scenes ?? fallbackScenes
+  const isGenerating = project?.status === 'queued' || project?.status === 'generating'
+  const scriptPreview = project?.script ?? createLocalScript(brief)
 
-    return baseStages.map((stage, index) => {
-      if (index < 3) return { ...stage, progress: 100, status: 'done' as const }
-      if (index === 3) return { ...stage, progress: 64, status: 'active' as const }
-      if (index === 4) return { ...stage, progress: 26, status: 'active' as const }
-      return { ...stage, progress: 8, status: 'queued' as const }
-    })
-  }, [isGenerating])
-
-  const scriptPreview = `В день рождения ${brief.name} получает волшебный пропуск в ${brief.world}. Чтобы вернуться домой с подарком для семьи, герой проходит три испытания, учится смелости и в финале устраивает собственную премьеру мультфильма.`
+  const overallProgress = useMemo(() => {
+    const total = stages.reduce((sum, stage) => sum + stage.progress, 0)
+    return Math.round(total / stages.length)
+  }, [stages])
 
   function updateBrief(field: keyof Brief, value: string) {
     setBrief((current) => ({ ...current, [field]: value }))
+  }
+
+  const loadProject = useCallback(async (projectId: string, ignore = false) => {
+    const response = await fetch(`${apiBase}/api/projects/${projectId}`)
+    if (!response.ok) throw new Error('Load project failed')
+    const data = (await response.json()) as { project: Project }
+    if (!ignore) {
+      setProject(data.project)
+      setBrief(data.project.brief)
+    }
+  }, [])
+
+  const createProject = useCallback(async (nextBrief: Brief, ignore = false) => {
+    setIsSaving(true)
+    try {
+      const response = await fetch(`${apiBase}/api/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nextBrief),
+      })
+      if (!response.ok) throw new Error('Create project failed')
+      const data = (await response.json()) as { project: Project }
+      if (!ignore) {
+        setProject(data.project)
+        setBrief(data.project.brief)
+        setApiState('online')
+      }
+      return data.project
+    } catch {
+      if (!ignore) setApiState('offline')
+      return null
+    } finally {
+      if (!ignore) setIsSaving(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    let ignore = false
+
+    async function bootstrap() {
+      try {
+        const response = await fetch(`${apiBase}/api/projects`)
+        if (!response.ok) throw new Error('API unavailable')
+        const data = (await response.json()) as { projects: Array<{ id: string }> }
+        const projectId = data.projects[0]?.id
+
+        if (projectId) {
+          await loadProject(projectId, ignore)
+        } else {
+          await createProject(seedBrief, ignore)
+        }
+
+        if (!ignore) setApiState('online')
+      } catch {
+        if (!ignore) setApiState('offline')
+      }
+    }
+
+    bootstrap()
+
+    return () => {
+      ignore = true
+    }
+  }, [createProject, loadProject])
+
+  useEffect(() => {
+    if (!project?.id || !isGenerating) return
+
+    const timer = window.setInterval(() => {
+      loadProject(project.id)
+    }, 1200)
+
+    return () => window.clearInterval(timer)
+  }, [isGenerating, loadProject, project?.id])
+
+  async function startGeneration() {
+    setIsSaving(true)
+    try {
+      const activeProject = project ?? (await createProject(brief))
+      if (!activeProject) return
+
+      const response = await fetch(`${apiBase}/api/projects/${activeProject.id}/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })
+      if (!response.ok) throw new Error('Generate failed')
+      await loadProject(activeProject.id)
+      setApiState('online')
+    } catch {
+      setApiState('offline')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -175,6 +272,7 @@ function App() {
             <p>Полный пайплайн: сценарий, персонаж, сцены, озвучка и финальный MP4.</p>
           </div>
           <div className="topbar-actions">
+            <span className={`api-status ${apiState}`}>{apiState === 'online' ? 'API online' : apiState === 'offline' ? 'offline demo' : 'connect'}</span>
             <button className="icon-button" aria-label="Скачать бриф">
               <Download size={18} />
             </button>
@@ -182,9 +280,9 @@ function App() {
               <RefreshCcw size={17} />
               Правка {revisionCount}
             </button>
-            <button className="primary-button" onClick={() => setIsGenerating((value) => !value)}>
-              {isGenerating ? <Loader2 className="spin" size={18} /> : <Rocket size={18} />}
-              {isGenerating ? 'Генерация идет' : 'Сгенерировать'}
+            <button className="primary-button" onClick={startGeneration} disabled={isSaving || isGenerating}>
+              {isSaving || isGenerating ? <Loader2 className="spin" size={18} /> : <Rocket size={18} />}
+              {isGenerating ? `Генерация ${overallProgress}%` : 'Сгенерировать'}
             </button>
           </div>
         </header>
@@ -236,7 +334,7 @@ function App() {
           <Panel title="Производство" icon={Clapperboard}>
             <div className="stage-list">
               {stages.map((stage) => (
-                <div className="stage-row" key={stage.title}>
+                <div className="stage-row" key={stage.slug}>
                   <div className={`stage-dot ${stage.status}`}>
                     {stage.status === 'done' ? <Check size={13} /> : null}
                   </div>
@@ -260,15 +358,15 @@ function App() {
               <h2>Раскадровка</h2>
               <p>Короткие 16:9 сцены сначала утверждаются как кадры, затем уходят в image-to-video.</p>
             </div>
-            <button className="secondary-button">
+            <button className="secondary-button" onClick={() => createProject(brief)}>
               <Wand2 size={17} />
-              Перегенерировать кадры
+              Новый сценарий
             </button>
           </div>
 
           <div className="storyboard-grid">
             {scenes.map((scene, index) => (
-              <article className="scene-card" key={scene.title}>
+              <article className="scene-card" key={`${scene.title}-${index}`}>
                 <div className={`scene-preview ${scene.gradient}`}>
                   <div className="scene-character">
                     <Sparkles size={24} />
@@ -308,6 +406,10 @@ function App() {
       </main>
     </div>
   )
+}
+
+function createLocalScript(brief: Brief) {
+  return `${brief.name} получает волшебный пропуск в ${brief.world} на событие: ${brief.occasion}. Чтобы вернуться домой с подарком для семьи, герой проходит три испытания, учится смелости и в финале устраивает собственную премьеру мультфильма. Тон истории: ${brief.tone}.`
 }
 
 function Panel({
