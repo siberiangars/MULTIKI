@@ -60,7 +60,7 @@ docker compose -p multstudio -f docker-compose.prod.yml up --build -d
 
 Caddy примет трафик на `80/443`, автоматически выпустит HTTPS-сертификат и прокинет запросы в контейнер `web`.
 
-Если на сервере уже есть общий Caddy в Docker-сети `shorts-factory_external`, используйте compose без собственного Caddy:
+Если на сервере уже есть общий Caddy в Docker-сети `shorts-factory_web`, используйте compose без собственного Caddy:
 
 ```bash
 docker compose -p multstudio -f docker-compose.server.yml up --build -d

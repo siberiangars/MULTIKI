@@ -38,4 +38,4 @@ volumes:
 networks:
   caddy-shared:
     external: true
-    name: shorts-factory_external
+    name: shorts-factory_web
