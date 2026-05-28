@@ -4,7 +4,7 @@ import { ZodError } from 'zod'
 import { config } from './config.js'
 import { closeDb, migrate } from './db.js'
 import { closeQueue, generationQueue } from './queue.js'
-import { createProject, getProject, listProjects, updateProjectStatus } from './projects.js'
+import { createProject, getProject, listProjects, resetProduction } from './projects.js'
 import { defaultBrief } from './domain.js'
 
 const app = Fastify({
@@ -60,7 +60,7 @@ app.post('/api/projects/:id/generate', async (request, reply) => {
     return reply.status(404).send({ error: 'ProjectNotFound' })
   }
 
-  await updateProjectStatus(id, 'queued')
+  await resetProduction(id)
   const job = await generationQueue.add('generate-project', { projectId: id })
   return reply.status(202).send({ jobId: job.id })
 })

@@ -169,6 +169,44 @@ export async function updateProjectStatus(projectId: string, status: string) {
   )
 }
 
+export async function resetProduction(projectId: string) {
+  const client = await db.connect()
+
+  try {
+    await client.query('begin')
+    await client.query(
+      `
+        update projects
+        set status = 'queued', updated_at = now()
+        where id = $1
+      `,
+      [projectId],
+    )
+    await client.query(
+      `
+        update project_stages
+        set progress = 0, status = 'queued', updated_at = now()
+        where project_id = $1
+      `,
+      [projectId],
+    )
+    await client.query(
+      `
+        update scenes
+        set image_status = case when image_url is null then 'pending' else image_status end
+        where project_id = $1
+      `,
+      [projectId],
+    )
+    await client.query('commit')
+  } catch (error) {
+    await client.query('rollback')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
 export async function updateStage(projectId: string, slug: string, progress: number, status: string) {
   await db.query(
     `

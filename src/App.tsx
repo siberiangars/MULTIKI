@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BadgeCheck,
   CalendarClock,
@@ -21,6 +21,7 @@ import {
   Upload,
   UserRound,
   Wand2,
+  X,
 } from 'lucide-react'
 import './App.css'
 
@@ -124,6 +125,10 @@ function App() {
   const [isSaving, setIsSaving] = useState(false)
   const [revisionCount, setRevisionCount] = useState(1)
   const [apiState, setApiState] = useState<'connecting' | 'online' | 'offline'>('connecting')
+  const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([])
+  const [previewScene, setPreviewScene] = useState<Scene | null>(null)
+  const [notice, setNotice] = useState('Готово к производству')
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const stages = project?.stages ?? fallbackStages
   const scenes = project?.scenes ?? fallbackScenes
@@ -137,6 +142,61 @@ function App() {
 
   function updateBrief(field: keyof Brief, value: string) {
     setBrief((current) => ({ ...current, [field]: value }))
+  }
+
+  function showNotice(message: string) {
+    setNotice(message)
+    window.setTimeout(() => setNotice('Готово к производству'), 2600)
+  }
+
+  function scrollToSection(label: string) {
+    const targetByLabel: Record<string, string> = {
+      Проекты: 'summary',
+      'Новый мультфильм': 'brief',
+      Персонажи: 'photos',
+      Тарифы: 'pricing',
+      Настройки: 'summary',
+    }
+    document.getElementById(targetByLabel[label] ?? 'summary')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    showNotice(`${label}: раздел открыт`)
+  }
+
+  function handlePhotoUpload(files: FileList | null) {
+    if (!files?.length) return
+    const nextPhotos = Array.from(files)
+      .slice(0, 8 - uploadedPhotos.length)
+      .map((file) => URL.createObjectURL(file))
+    setUploadedPhotos((current) => [...current, ...nextPhotos].slice(0, 8))
+    showNotice(`Загружено фото: ${Math.min(uploadedPhotos.length + nextPhotos.length, 8)}`)
+  }
+
+  function downloadBrief() {
+    const payload = {
+      projectId: project?.id ?? 'draft',
+      status: project?.status ?? 'draft',
+      brief,
+      script: scriptPreview,
+      scenes,
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `multstudio-brief-${project?.id ?? 'draft'}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    showNotice('Бриф скачан')
+  }
+
+  async function createRevision() {
+    setRevisionCount((count) => count + 1)
+    const revisedBrief = {
+      ...brief,
+      tone: brief.tone.includes('кинематографичный') ? brief.tone : `${brief.tone}, кинематографичный`,
+    }
+    setBrief(revisedBrief)
+    await createProject(revisedBrief)
+    showNotice('Создана новая версия сценария')
   }
 
   const loadProject = useCallback(async (projectId: string, ignore = false) => {
@@ -250,7 +310,11 @@ function App() {
           {nav.map((item) => {
             const Icon = item.icon
             return (
-              <button className={item.active ? 'nav-item active' : 'nav-item'} key={item.label}>
+              <button
+                className={item.active ? 'nav-item active' : 'nav-item'}
+                key={item.label}
+                onClick={() => scrollToSection(item.label)}
+              >
                 <Icon size={18} />
                 <span>{item.label}</span>
               </button>
@@ -275,10 +339,11 @@ function App() {
           </div>
           <div className="topbar-actions">
             <span className={`api-status ${apiState}`}>{apiState === 'online' ? 'API online' : apiState === 'offline' ? 'offline demo' : 'connect'}</span>
-            <button className="icon-button" aria-label="Скачать бриф">
+            <span className="notice">{notice}</span>
+            <button className="icon-button" aria-label="Скачать бриф" onClick={downloadBrief}>
               <Download size={18} />
             </button>
-            <button className="secondary-button" onClick={() => setRevisionCount((count) => count + 1)}>
+            <button className="secondary-button" onClick={createRevision} disabled={isSaving}>
               <RefreshCcw size={17} />
               Правка {revisionCount}
             </button>
@@ -289,28 +354,52 @@ function App() {
           </div>
         </header>
 
-        <section className="summary-strip" aria-label="Сводка проекта">
+        <section className="summary-strip" id="summary" aria-label="Сводка проекта">
           <Metric icon={CalendarClock} label="Срок" value="18-35 мин" />
           <Metric icon={BadgeCheck} label="Качество" value="1080p MP4" />
           <Metric icon={Mic2} label="Озвучка" value="RU диктор" />
           <Metric icon={CreditCard} label="Себестоимость" value="~700-1800 ₽" />
         </section>
 
-        <section className="build-grid">
+        <section className="build-grid" id="brief">
           <Panel title="Фото клиента" icon={Upload}>
-            <div className="upload-zone">
+            <div className="upload-zone" id="photos">
               <Camera size={24} />
               <strong>3-8 фото ребенка</strong>
               <span>анфас, улыбка, полный рост, разный свет</span>
-              <button>Загрузить фото</button>
+              <button onClick={() => fileInputRef.current?.click()}>Загрузить фото</button>
+              <input
+                ref={fileInputRef}
+                className="hidden-file"
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(event) => handlePhotoUpload(event.currentTarget.files)}
+              />
             </div>
             <div className="photo-grid" aria-label="Загруженные фото">
-              <div className="photo-thumb thumb-one" />
-              <div className="photo-thumb thumb-two" />
-              <div className="photo-thumb thumb-three" />
-              <div className="photo-thumb empty-thumb">
-                <Image size={18} />
-              </div>
+              {[0, 1, 2, 3].map((index) =>
+                uploadedPhotos[index] ? (
+                  <div className="photo-thumb" key={index}>
+                    <img src={uploadedPhotos[index]} alt={`Фото клиента ${index + 1}`} />
+                  </div>
+                ) : (
+                  <div
+                    className={
+                      index === 0
+                        ? 'photo-thumb thumb-one'
+                        : index === 1
+                          ? 'photo-thumb thumb-two'
+                          : index === 2
+                            ? 'photo-thumb thumb-three'
+                            : 'photo-thumb empty-thumb'
+                    }
+                    key={index}
+                  >
+                    {index === 3 ? <Image size={18} /> : null}
+                  </div>
+                ),
+              )}
             </div>
             <label className="consent">
               <input type="checkbox" defaultChecked />
@@ -354,13 +443,13 @@ function App() {
           </Panel>
         </section>
 
-        <section className="storyboard-section">
+        <section className="storyboard-section" id="storyboard">
           <div className="section-heading">
             <div>
               <h2>Раскадровка</h2>
               <p>Короткие 16:9 сцены сначала утверждаются как кадры, затем уходят в image-to-video.</p>
             </div>
-            <button className="secondary-button" onClick={() => createProject(brief)}>
+            <button className="secondary-button" onClick={() => createProject(brief).then(() => showNotice('Создан новый сценарий'))}>
               <Wand2 size={17} />
               Новый сценарий
             </button>
@@ -378,7 +467,7 @@ function App() {
                     </div>
                   )}
                   {scene.image_status === 'generating' ? <span className="scene-status">OpenAI</span> : null}
-                  <button aria-label="Предпросмотр сцены">
+                  <button aria-label="Предпросмотр сцены" onClick={() => setPreviewScene(scene)}>
                     <Play size={18} fill="currentColor" />
                   </button>
                 </div>
@@ -392,7 +481,7 @@ function App() {
           </div>
         </section>
 
-        <section className="pricing-section">
+        <section className="pricing-section" id="pricing">
           <div className="section-heading">
             <div>
               <h2>Монетизация</h2>
@@ -401,7 +490,7 @@ function App() {
           </div>
           <div className="plan-grid">
             {plans.map((plan) => (
-              <article className="plan-card" key={plan.name}>
+              <article className="plan-card" key={plan.name} onClick={() => showNotice(`Выбран тариф: ${plan.name}`)}>
                 <span>{plan.name}</span>
                 <strong>{plan.price}</strong>
                 <p>{plan.note}</p>
@@ -411,6 +500,27 @@ function App() {
           </div>
         </section>
       </main>
+
+      {previewScene ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Предпросмотр сцены">
+          <div className="preview-modal">
+            <button className="modal-close" aria-label="Закрыть предпросмотр" onClick={() => setPreviewScene(null)}>
+              <X size={18} />
+            </button>
+            <div className={`scene-preview modal-preview ${previewScene.gradient}`}>
+              {previewScene.image_url ? (
+                <img src={previewScene.image_url} alt={previewScene.title} />
+              ) : (
+                <div className="scene-character">
+                  <Sparkles size={24} />
+                </div>
+              )}
+            </div>
+            <h2>{previewScene.title}</h2>
+            <p>{previewScene.prompt}</p>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

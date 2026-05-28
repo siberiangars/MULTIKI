@@ -183,6 +183,16 @@
   color: #087a91;
 }
 
+.notice {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  max-width: 190px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 button {
   font: inherit;
 }
@@ -220,6 +230,11 @@ button {
   color: #263241;
   font-size: 13px;
   font-weight: 720;
+}
+
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .icon-button {
@@ -339,6 +354,10 @@ button {
   font-weight: 760;
 }
 
+.hidden-file {
+  display: none;
+}
+
 .photo-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -347,9 +366,17 @@ button {
 }
 
 .photo-thumb {
+  position: relative;
+  overflow: hidden;
   aspect-ratio: 1;
   border-radius: 8px;
   background: #edf2f6;
+}
+
+.photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .thumb-one {
@@ -662,6 +689,15 @@ button {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #fbfcfd;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+
+.plan-card:hover {
+  border-color: #58d7ef;
+  transform: translateY(-1px);
 }
 
 .plan-card span,
@@ -692,6 +728,57 @@ button {
 
 .spin {
   animation: spin 900ms linear infinite;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.preview-modal {
+  position: relative;
+  width: min(760px, 100%);
+  padding: 16px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.28);
+}
+
+.modal-close {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+  cursor: pointer;
+}
+
+.modal-preview {
+  border-radius: 8px;
+}
+
+.preview-modal h2 {
+  margin: 14px 0 6px;
+  color: var(--text-strong);
+  font-size: 20px;
+}
+
+.preview-modal p {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.55;
 }
 
 @keyframes spin {
