@@ -14,6 +14,6 @@ export const config = {
   openaiImageQuality: process.env.OPENAI_IMAGE_QUALITY ?? 'medium',
   abacusApiKey: process.env.ABACUS_API_KEY ?? '',
   abacusVideoEndpoint: process.env.ABACUS_VIDEO_ENDPOINT ?? '',
-  abacusVideoModel: process.env.ABACUS_VIDEO_MODEL ?? '',
+  abacusVideoModel: process.env.ABACUS_VIDEO_MODEL ?? 'kling_ai_v26',
   abacusVideoDuration: Number(process.env.ABACUS_VIDEO_DURATION ?? 5),
 }
