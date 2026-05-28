@@ -12,4 +12,8 @@ export const config = {
   openaiImageModel: process.env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1.5',
   openaiImageSize: process.env.OPENAI_IMAGE_SIZE ?? '1536x1024',
   openaiImageQuality: process.env.OPENAI_IMAGE_QUALITY ?? 'medium',
+  abacusApiKey: process.env.ABACUS_API_KEY ?? '',
+  abacusVideoEndpoint: process.env.ABACUS_VIDEO_ENDPOINT ?? '',
+  abacusVideoModel: process.env.ABACUS_VIDEO_MODEL ?? '',
+  abacusVideoDuration: Number(process.env.ABACUS_VIDEO_DURATION ?? 5),
 }

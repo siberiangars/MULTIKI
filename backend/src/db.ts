@@ -47,6 +47,11 @@ export async function migrate() {
       image_url text,
       image_provider text,
       image_status text not null default 'pending',
+      video_url text,
+      video_provider text,
+      video_status text not null default 'pending',
+      video_prompt text,
+      video_job_id text,
       sort_order integer not null,
       created_at timestamptz not null default now()
     );
@@ -54,6 +59,11 @@ export async function migrate() {
     alter table scenes add column if not exists image_url text;
     alter table scenes add column if not exists image_provider text;
     alter table scenes add column if not exists image_status text not null default 'pending';
+    alter table scenes add column if not exists video_url text;
+    alter table scenes add column if not exists video_provider text;
+    alter table scenes add column if not exists video_status text not null default 'pending';
+    alter table scenes add column if not exists video_prompt text;
+    alter table scenes add column if not exists video_job_id text;
   `)
 }
 

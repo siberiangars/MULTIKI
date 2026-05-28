@@ -64,3 +64,15 @@ export function createImagePrompt(scenePrompt: string, brief: Brief) {
     'Composition: 16:9 wide cinematic frame, clear subject, rich background detail, no text, no logos, no watermark.',
   ].join(' ')
 }
+
+export function createVideoPrompt(scenePrompt: string, brief: Brief) {
+  return [
+    'Animate this keyframe as a polished short family cartoon scene.',
+    `Main character: ${brief.name}, ${brief.age} years old, keep the same face, outfit, colors, and proportions from the source image.`,
+    `Scene action: ${scenePrompt}.`,
+    `Story world: ${brief.world}.`,
+    'Camera: slow cinematic push-in, gentle parallax, expressive but natural character motion, no scene cuts.',
+    'Style: premium 3D animated family film, warm lighting, wholesome, no text, no logos, no watermark.',
+    'Duration: 5 seconds, 16:9.',
+  ].join(' ')
+}

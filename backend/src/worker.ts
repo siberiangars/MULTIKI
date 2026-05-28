@@ -2,13 +2,15 @@ import { Worker } from 'bullmq'
 import { config } from './config.js'
 import { closeDb, migrate } from './db.js'
 import { connection } from './queue.js'
-import { createImagePrompt, stageTemplates } from './domain.js'
+import { createImagePrompt, createVideoPrompt, stageTemplates } from './domain.js'
+import { createAbacusVideoJob, hasAbacusApiKey } from './abacus-video.js'
 import { generateImage, hasOpenAIImages } from './openai-images.js'
 import {
   getProject,
   listScenesForProject,
   updateProjectStatus,
   updateSceneImage,
+  updateSceneVideo,
   updateStage,
 } from './projects.js'
 
@@ -28,6 +30,10 @@ const worker = new Worker(
 
       if (stage.slug === 'frames') {
         await generateSceneFrames(projectId)
+      }
+
+      if (stage.slug === 'animation') {
+        await generateSceneVideos(projectId)
       }
 
       for (const progress of [24, 48, 76, 100]) {
@@ -62,6 +68,33 @@ async function generateSceneFrames(projectId: string) {
     } catch (error) {
       console.error(`Scene image generation failed for ${scene.id}`, error)
       await updateSceneImage(scene.id, scene.image_url, 'openai', 'failed')
+    }
+  }
+}
+
+async function generateSceneVideos(projectId: string) {
+  if (!hasAbacusApiKey()) return
+
+  const project = await getProject(projectId)
+  if (!project) return
+
+  const scenes = await listScenesForProject(projectId)
+
+  for (const scene of scenes) {
+    if (!scene.image_url) {
+      await updateSceneVideo(scene.id, scene.video_url, 'abacus', 'waiting_for_image', scene.video_prompt, null)
+      continue
+    }
+
+    const prompt = createVideoPrompt(scene.prompt, project.brief)
+
+    try {
+      await updateSceneVideo(scene.id, scene.video_url, 'abacus', 'generating', prompt, null)
+      const result = await createAbacusVideoJob({ prompt, imageUrl: scene.image_url })
+      await updateSceneVideo(scene.id, result.videoUrl, 'abacus', result.status, prompt, result.jobId)
+    } catch (error) {
+      console.error(`Scene video generation failed for ${scene.id}`, error)
+      await updateSceneVideo(scene.id, scene.video_url, 'abacus', 'failed', prompt, null)
     }
   }
 }

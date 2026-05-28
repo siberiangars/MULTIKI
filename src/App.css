@@ -710,6 +710,20 @@ button {
   text-transform: uppercase;
 }
 
+.video-status {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 2;
+  padding: 5px 7px;
+  border-radius: 7px;
+  background: rgba(6, 167, 199, 0.86);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
 .scene-character {
   position: relative;
   z-index: 1;
@@ -765,6 +779,13 @@ button {
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.scene-meta small {
+  margin-top: 8px;
+  color: #087a91;
+  font-size: 11px;
+  font-weight: 780;
 }
 
 .plan-grid {
@@ -925,6 +946,19 @@ button {
   background: rgba(17, 24, 39, 0.76);
   color: #fff;
   font-size: 12px;
+  font-weight: 800;
+}
+
+.film-frame small {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  z-index: 2;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: rgba(6, 167, 199, 0.86);
+  color: #fff;
+  font-size: 11px;
   font-weight: 800;
 }
 

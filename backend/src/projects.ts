@@ -99,6 +99,7 @@ export async function getProject(projectId: string) {
     db.query(
       `
         select id, title, prompt, gradient, image_url, image_provider, image_status, sort_order
+          , video_url, video_provider, video_status, video_prompt, video_job_id
         from scenes
         where project_id = $1
         order by sort_order asc
@@ -129,9 +130,12 @@ export async function listScenesForProject(projectId: string) {
     prompt: string
     gradient: string
     image_url: string | null
+    video_url: string | null
+    video_status: string
+    video_prompt: string | null
   }>(
     `
-      select id, title, prompt, gradient, image_url
+      select id, title, prompt, gradient, image_url, video_url, video_status, video_prompt
       from scenes
       where project_id = $1
       order by sort_order asc
@@ -140,6 +144,28 @@ export async function listScenesForProject(projectId: string) {
   )
 
   return result.rows
+}
+
+export async function updateSceneVideo(
+  sceneId: string,
+  videoUrl: string | null,
+  videoProvider: string | null,
+  videoStatus: string,
+  videoPrompt: string | null,
+  videoJobId: string | null,
+) {
+  await db.query(
+    `
+      update scenes
+      set video_url = $2,
+          video_provider = $3,
+          video_status = $4,
+          video_prompt = $5,
+          video_job_id = $6
+      where id = $1
+    `,
+    [sceneId, videoUrl, videoProvider, videoStatus, videoPrompt, videoJobId],
+  )
 }
 
 export async function updateSceneImage(
@@ -193,7 +219,8 @@ export async function resetProduction(projectId: string) {
     await client.query(
       `
         update scenes
-        set image_status = case when image_url is null then 'pending' else image_status end
+        set image_status = case when image_url is null then 'pending' else image_status end,
+            video_status = case when video_url is null then 'pending' else video_status end
         where project_id = $1
       `,
       [projectId],

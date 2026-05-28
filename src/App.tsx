@@ -13,7 +13,6 @@ import {
   Film,
   Image,
   Loader2,
-  Mic2,
   Play,
   RefreshCcw,
   Rocket,
@@ -53,6 +52,10 @@ type Scene = {
   gradient: string
   image_url?: string | null
   image_status?: string
+  video_url?: string | null
+  video_status?: string
+  video_prompt?: string | null
+  video_job_id?: string | null
 }
 
 type Project = {
@@ -146,7 +149,10 @@ function App() {
   const isGenerating = project?.status === 'queued' || project?.status === 'generating'
   const scriptPreview = project?.script ?? createLocalScript(brief)
   const readyImages = scenes.filter((scene) => scene.image_url && scene.image_status === 'ready').length
+  const readyVideos = scenes.filter((scene) => scene.video_url && scene.video_status === 'ready').length
+  const preparedVideos = scenes.filter((scene) => scene.video_status === 'prepared' || scene.video_prompt).length
   const hasGeneratedFrames = readyImages > 0
+  const hasVideoPrep = readyVideos > 0 || preparedVideos > 0
 
   const overallProgress = useMemo(() => {
     const total = stages.reduce((sum, stage) => sum + stage.progress, 0)
@@ -155,9 +161,11 @@ function App() {
 
   const productionStatus = useMemo(() => {
     if (isGenerating) return `Генерация: ${overallProgress}%`
+    if (readyVideos > 0) return `Видео ${readyVideos}/${scenes.length} сцен`
+    if (preparedVideos > 0) return `Abacus prompts ${preparedVideos}/${scenes.length}`
     if (hasGeneratedFrames) return `Готово ${readyImages}/${scenes.length} кадров`
     return 'Ожидает генерации'
-  }, [hasGeneratedFrames, isGenerating, overallProgress, readyImages, scenes.length])
+  }, [hasGeneratedFrames, isGenerating, overallProgress, preparedVideos, readyImages, readyVideos, scenes.length])
 
   function updateBrief(field: keyof Brief, value: string) {
     setBrief((current) => ({ ...current, [field]: value }))
@@ -195,12 +203,16 @@ function App() {
         prompt: scene.prompt,
         imageStatus: scene.image_status ?? 'pending',
         imageUrl: scene.image_url ?? null,
+        videoProvider: 'abacus',
+        videoStatus: scene.video_status ?? 'pending',
+        videoUrl: scene.video_url ?? null,
+        abacusImageToVideoPrompt: scene.video_prompt ?? createAbacusVideoPrompt(scene.prompt, brief),
         montageNote: `План ${index + 1}: 4-6 секунд, мягкий camera push, переход по музыке.`,
       })),
       deliveryChecklist: [
         'Проверить похожесть персонажа и отсутствие лишнего текста на кадрах.',
         'Утвердить сценарий с клиентом до запуска анимации.',
-        'После подключения Kling отправлять каждый кадр в image-to-video.',
+        'Abacus AI: отправить imageUrl + abacusImageToVideoPrompt в image-to-video генерацию.',
         'После подключения ElevenLabs генерировать голос и собирать финальный MP4.',
       ],
     }
@@ -387,7 +399,7 @@ function App() {
         <section className="summary-strip" id="summary" aria-label="Сводка проекта">
           <Metric icon={CalendarClock} label="Сейчас готово" value={productionStatus} />
           <Metric icon={BadgeCheck} label="Формат кадров" value="16:9, 1536px" />
-          <Metric icon={Mic2} label="Озвучка" value="ElevenLabs далее" />
+          <Metric icon={Film} label="Видео" value={hasVideoPrep ? 'Abacus готов' : 'Abacus далее'} />
           <Metric icon={CreditCard} label="Цена подписки" value="9 900 ₽ лучше" />
         </section>
 
@@ -481,6 +493,13 @@ function App() {
                 disabled={!hasGeneratedFrames}
               />
               <ActionButton
+                icon={Film}
+                title="Abacus image-to-video"
+                detail={hasVideoPrep ? 'Промпты или видео-задачи подготовлены.' : 'Запускается на стадии анимации после кадров.'}
+                onClick={downloadProductionPack}
+                disabled={!hasGeneratedFrames}
+              />
+              <ActionButton
                 icon={Download}
                 title="Скачать production pack"
                 detail="JSON для клиента, монтажера или следующего AI-шага."
@@ -514,6 +533,7 @@ function App() {
                     </div>
                   )}
                   {scene.image_status ? <span className="scene-status">{scene.image_status}</span> : null}
+                  {scene.video_status && scene.video_status !== 'pending' ? <span className="video-status">{scene.video_status}</span> : null}
                   <button aria-label="Предпросмотр сцены" onClick={() => setPreviewScene(scene)}>
                     <Play size={18} fill="currentColor" />
                   </button>
@@ -522,6 +542,7 @@ function App() {
                   <span>Сцена {index + 1}</span>
                   <strong>{scene.title}</strong>
                   <p>{scene.prompt}</p>
+                  {scene.video_prompt ? <small>Abacus prompt prepared</small> : null}
                 </div>
               </article>
             ))}
@@ -586,6 +607,17 @@ function createLocalScript(brief: Brief) {
 
 function createVoiceover(script: string, brief: Brief) {
   return `Диктор, теплый семейный тон. ${script} Финальная фраза: "${brief.name}, твое главное приключение только начинается".`
+}
+
+function createAbacusVideoPrompt(scenePrompt: string, brief: Brief) {
+  return [
+    'Animate this keyframe as a polished short family cartoon scene.',
+    `Keep ${brief.name}, ${brief.age} years old, visually consistent with the source image.`,
+    `Scene action: ${scenePrompt}.`,
+    `Story world: ${brief.world}.`,
+    'Slow cinematic push-in, gentle parallax, expressive natural motion, no text, no logos, no watermark.',
+    'Duration 5 seconds, 16:9.',
+  ].join(' ')
 }
 
 function Panel({ title, icon: Icon, children }: { title: string; icon: LucideIcon; children: React.ReactNode }) {
@@ -688,6 +720,7 @@ function FilmModal({ scenes, brief, script, onClose }: { scenes: Scene[]; brief:
             <div className={`film-frame ${scene.gradient}`} style={{ animationDelay: `${index * 3}s` }} key={`${scene.title}-${index}`}>
               {scene.image_url ? <img src={scene.image_url} alt={scene.title} /> : <Sparkles size={38} />}
               <span>{scene.title}</span>
+              {scene.video_status && scene.video_status !== 'pending' ? <small>Abacus: {scene.video_status}</small> : null}
             </div>
           ))}
         </div>
