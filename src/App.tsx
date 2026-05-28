@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import {
   BadgeCheck,
   CalendarClock,
@@ -9,6 +10,7 @@ import {
   CreditCard,
   Download,
   FileText,
+  Film,
   Image,
   Loader2,
   Mic2,
@@ -74,12 +76,12 @@ const seedBrief: Brief = {
 }
 
 const fallbackStages: Stage[] = [
-  { slug: 'script', title: 'Сценарий', detail: '12 сцен, арка героя', progress: 100, status: 'done' },
-  { slug: 'character', title: 'Образ героя', detail: 'единый character sheet', progress: 76, status: 'active' },
-  { slug: 'frames', title: 'Кадры', detail: '3D ключевые сцены', progress: 42, status: 'active' },
-  { slug: 'animation', title: 'Анимация', detail: 'image-to-video клипы', progress: 18, status: 'queued' },
-  { slug: 'voice', title: 'Озвучка', detail: 'диктор, эмоции, паузы', progress: 0, status: 'queued' },
-  { slug: 'edit', title: 'Монтаж', detail: 'музыка, титры, MP4', progress: 0, status: 'queued' },
+  { slug: 'script', title: 'Сценарий', detail: 'арка героя и продюсерский текст', progress: 100, status: 'done' },
+  { slug: 'character', title: 'Образ героя', detail: 'единый визуальный стиль', progress: 76, status: 'active' },
+  { slug: 'frames', title: 'Ключевые кадры', detail: 'OpenAI Images, 16:9', progress: 42, status: 'active' },
+  { slug: 'animation', title: 'Анимация', detail: 'следующий модуль: Kling', progress: 0, status: 'queued' },
+  { slug: 'voice', title: 'Озвучка', detail: 'следующий модуль: ElevenLabs', progress: 0, status: 'queued' },
+  { slug: 'edit', title: 'Монтаж', detail: 'следующий модуль: сборка MP4', progress: 0, status: 'queued' },
 ]
 
 const fallbackScenes: Scene[] = [
@@ -106,17 +108,25 @@ const fallbackScenes: Scene[] = [
 ]
 
 const nav = [
-  { label: 'Проекты', icon: Clapperboard, active: false },
-  { label: 'Новый мультфильм', icon: Wand2, active: true },
-  { label: 'Персонажи', icon: UserRound, active: false },
-  { label: 'Тарифы', icon: CreditCard, active: false },
-  { label: 'Настройки', icon: Settings, active: false },
+  { label: 'Заказы', icon: Clapperboard, target: 'summary' },
+  { label: 'Новый мультфильм', icon: Wand2, target: 'brief' },
+  { label: 'Фото', icon: UserRound, target: 'photos' },
+  { label: 'Производство', icon: Film, target: 'production' },
+  { label: 'Тарифы', icon: CreditCard, target: 'pricing' },
+  { label: 'Настройки', icon: Settings, target: 'summary' },
 ]
 
 const plans = [
-  { name: 'Старт', price: '5 000 ₽', note: '2 ролика до 45 сек', margin: 'маржа 45-60%' },
-  { name: 'Студия', price: '9 900 ₽', note: '5 роликов или 2 длинных', margin: 'приоритетная очередь' },
-  { name: 'Премиум', price: '19 900 ₽', note: 'ручная режиссура и 3 правки', margin: 'для подарков и B2B' },
+  { name: 'Старт', price: '5 000 ₽', note: '2 ролика до 45 сек', margin: 'продавать как быстрый подарок' },
+  { name: 'Студия', price: '9 900 ₽', note: '5 роликов или 2 длинных', margin: 'лучший тариф для подписки' },
+  { name: 'Премиум', price: '19 900 ₽', note: 'ручная режиссура и 3 правки', margin: 'для B2B и праздников' },
+]
+
+const usageSteps = [
+  'Заполни бриф: имя, возраст, повод, мир истории и тон.',
+  'Загрузи 3-8 фото клиента. Сейчас фото видны в кабинете, следующий шаг - привязка к генерации персонажа.',
+  'Нажми “Сгенерировать кадры”. Сервис создаст сценарий, раскадровку и ключевые изображения.',
+  'Проверь кадры, открой аниматик и скачай production pack для клиента или монтажа.',
 ]
 
 function App() {
@@ -127,18 +137,27 @@ function App() {
   const [apiState, setApiState] = useState<'connecting' | 'online' | 'offline'>('connecting')
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([])
   const [previewScene, setPreviewScene] = useState<Scene | null>(null)
-  const [notice, setNotice] = useState('Готово к производству')
+  const [filmPreviewOpen, setFilmPreviewOpen] = useState(false)
+  const [notice, setNotice] = useState('Готово к работе')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const stages = project?.stages ?? fallbackStages
   const scenes = project?.scenes ?? fallbackScenes
   const isGenerating = project?.status === 'queued' || project?.status === 'generating'
   const scriptPreview = project?.script ?? createLocalScript(brief)
+  const readyImages = scenes.filter((scene) => scene.image_url && scene.image_status === 'ready').length
+  const hasGeneratedFrames = readyImages > 0
 
   const overallProgress = useMemo(() => {
     const total = stages.reduce((sum, stage) => sum + stage.progress, 0)
     return Math.round(total / stages.length)
   }, [stages])
+
+  const productionStatus = useMemo(() => {
+    if (isGenerating) return `Генерация: ${overallProgress}%`
+    if (hasGeneratedFrames) return `Готово ${readyImages}/${scenes.length} кадров`
+    return 'Ожидает генерации'
+  }, [hasGeneratedFrames, isGenerating, overallProgress, readyImages, scenes.length])
 
   function updateBrief(field: keyof Brief, value: string) {
     setBrief((current) => ({ ...current, [field]: value }))
@@ -146,18 +165,11 @@ function App() {
 
   function showNotice(message: string) {
     setNotice(message)
-    window.setTimeout(() => setNotice('Готово к производству'), 2600)
+    window.setTimeout(() => setNotice('Готово к работе'), 2600)
   }
 
-  function scrollToSection(label: string) {
-    const targetByLabel: Record<string, string> = {
-      Проекты: 'summary',
-      'Новый мультфильм': 'brief',
-      Персонажи: 'photos',
-      Тарифы: 'pricing',
-      Настройки: 'summary',
-    }
-    document.getElementById(targetByLabel[label] ?? 'summary')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  function scrollToSection(target: string, label: string) {
+    document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     showNotice(`${label}: раздел открыт`)
   }
 
@@ -170,22 +182,36 @@ function App() {
     showNotice(`Загружено фото: ${Math.min(uploadedPhotos.length + nextPhotos.length, 8)}`)
   }
 
-  function downloadBrief() {
+  function downloadProductionPack() {
     const payload = {
       projectId: project?.id ?? 'draft',
       status: project?.status ?? 'draft',
       brief,
-      script: scriptPreview,
-      scenes,
+      producerScript: scriptPreview,
+      voiceover: createVoiceover(scriptPreview, brief),
+      storyboard: scenes.map((scene, index) => ({
+        scene: index + 1,
+        title: scene.title,
+        prompt: scene.prompt,
+        imageStatus: scene.image_status ?? 'pending',
+        imageUrl: scene.image_url ?? null,
+        montageNote: `План ${index + 1}: 4-6 секунд, мягкий camera push, переход по музыке.`,
+      })),
+      deliveryChecklist: [
+        'Проверить похожесть персонажа и отсутствие лишнего текста на кадрах.',
+        'Утвердить сценарий с клиентом до запуска анимации.',
+        'После подключения Kling отправлять каждый кадр в image-to-video.',
+        'После подключения ElevenLabs генерировать голос и собирать финальный MP4.',
+      ],
     }
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `multstudio-brief-${project?.id ?? 'draft'}.json`
+    link.download = `multstudio-production-pack-${project?.id ?? 'draft'}.json`
     link.click()
     URL.revokeObjectURL(url)
-    showNotice('Бриф скачан')
+    showNotice('Production pack скачан')
   }
 
   async function createRevision() {
@@ -286,8 +312,10 @@ function App() {
       if (!response.ok) throw new Error('Generate failed')
       await loadProject(activeProject.id)
       setApiState('online')
+      showNotice('Производство запущено')
     } catch {
       setApiState('offline')
+      showNotice('API недоступен')
     } finally {
       setIsSaving(false)
     }
@@ -307,13 +335,13 @@ function App() {
         </div>
 
         <nav className="nav-list">
-          {nav.map((item) => {
+          {nav.map((item, index) => {
             const Icon = item.icon
             return (
               <button
-                className={item.active ? 'nav-item active' : 'nav-item'}
+                className={index === 1 ? 'nav-item active' : 'nav-item'}
                 key={item.label}
-                onClick={() => scrollToSection(item.label)}
+                onClick={() => scrollToSection(item.target, item.label)}
               >
                 <Icon size={18} />
                 <span>{item.label}</span>
@@ -324,7 +352,7 @@ function App() {
 
         <div className="sidebar-footer">
           <ShieldCheck size={18} />
-          <p>Фото детей удаляются из черновиков через 14 дней. Публичная публикация только по согласию родителя.</p>
+          <p>Фото детей хранятся только для заказа. Публичная публикация результата - только с согласием родителя.</p>
         </div>
       </aside>
 
@@ -332,15 +360,17 @@ function App() {
         <header className="topbar">
           <div>
             <div className="breadcrumbs">
-              Проекты <ChevronRight size={14} /> Новый заказ
+              Заказы <ChevronRight size={14} /> Новый мультфильм
             </div>
             <h1>Новый мультфильм</h1>
-            <p>Полный пайплайн: сценарий, персонаж, сцены, озвучка и финальный MP4.</p>
+            <p>Рабочий путь: бриф, фото, ключевые кадры, аниматик, затем озвучка и монтаж после подключения провайдеров.</p>
           </div>
           <div className="topbar-actions">
-            <span className={`api-status ${apiState}`}>{apiState === 'online' ? 'API online' : apiState === 'offline' ? 'offline demo' : 'connect'}</span>
+            <span className={`api-status ${apiState}`}>
+              {apiState === 'online' ? 'API online' : apiState === 'offline' ? 'offline demo' : 'connect'}
+            </span>
             <span className="notice">{notice}</span>
-            <button className="icon-button" aria-label="Скачать бриф" onClick={downloadBrief}>
+            <button className="icon-button" aria-label="Скачать production pack" onClick={downloadProductionPack}>
               <Download size={18} />
             </button>
             <button className="secondary-button" onClick={createRevision} disabled={isSaving}>
@@ -349,16 +379,28 @@ function App() {
             </button>
             <button className="primary-button" onClick={startGeneration} disabled={isSaving || isGenerating}>
               {isSaving || isGenerating ? <Loader2 className="spin" size={18} /> : <Rocket size={18} />}
-              {isGenerating ? `Генерация ${overallProgress}%` : 'Сгенерировать'}
+              {isGenerating ? `Генерация ${overallProgress}%` : hasGeneratedFrames ? 'Перегенерировать кадры' : 'Сгенерировать кадры'}
             </button>
           </div>
         </header>
 
         <section className="summary-strip" id="summary" aria-label="Сводка проекта">
-          <Metric icon={CalendarClock} label="Срок" value="18-35 мин" />
-          <Metric icon={BadgeCheck} label="Качество" value="1080p MP4" />
-          <Metric icon={Mic2} label="Озвучка" value="RU диктор" />
-          <Metric icon={CreditCard} label="Себестоимость" value="~700-1800 ₽" />
+          <Metric icon={CalendarClock} label="Сейчас готово" value={productionStatus} />
+          <Metric icon={BadgeCheck} label="Формат кадров" value="16:9, 1536px" />
+          <Metric icon={Mic2} label="Озвучка" value="ElevenLabs далее" />
+          <Metric icon={CreditCard} label="Цена подписки" value="9 900 ₽ лучше" />
+        </section>
+
+        <section className="usage-panel" aria-label="Как пользоваться">
+          <div>
+            <h2>Как этим пользоваться</h2>
+            <p>Сейчас сервис закрывает первый производственный этап: сценарий и ключевые кадры. Это уже можно показывать клиенту как предпросмотр и брать оплату за запуск полного ролика.</p>
+          </div>
+          <ol>
+            {usageSteps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
         </section>
 
         <section className="build-grid" id="brief">
@@ -422,23 +464,28 @@ function App() {
             </div>
           </Panel>
 
-          <Panel title="Производство" icon={Clapperboard}>
-            <div className="stage-list">
-              {stages.map((stage) => (
-                <div className="stage-row" key={stage.slug}>
-                  <div className={`stage-dot ${stage.status}`}>
-                    {stage.status === 'done' ? <Check size={13} /> : null}
-                  </div>
-                  <div className="stage-copy">
-                    <strong>{stage.title}</strong>
-                    <span>{stage.detail}</span>
-                    <div className="progress-track">
-                      <div style={{ width: `${stage.progress}%` }} />
-                    </div>
-                  </div>
-                  <small>{stage.progress}%</small>
-                </div>
-              ))}
+          <Panel title="Что делать дальше" icon={Clapperboard}>
+            <div className="action-stack" id="production">
+              <ActionButton
+                icon={Rocket}
+                title={hasGeneratedFrames ? 'Перегенерировать кадры' : 'Сгенерировать кадры'}
+                detail="Создает сценарий, раскадровку и OpenAI keyframes."
+                onClick={startGeneration}
+                disabled={isSaving || isGenerating}
+              />
+              <ActionButton
+                icon={Play}
+                title="Открыть аниматик"
+                detail="Черновой просмотр ролика по готовым кадрам."
+                onClick={() => setFilmPreviewOpen(true)}
+                disabled={!hasGeneratedFrames}
+              />
+              <ActionButton
+                icon={Download}
+                title="Скачать production pack"
+                detail="JSON для клиента, монтажера или следующего AI-шага."
+                onClick={downloadProductionPack}
+              />
             </div>
           </Panel>
         </section>
@@ -447,7 +494,7 @@ function App() {
           <div className="section-heading">
             <div>
               <h2>Раскадровка</h2>
-              <p>Короткие 16:9 сцены сначала утверждаются как кадры, затем уходят в image-to-video.</p>
+              <p>Это не финальное видео, а набор утверждаемых ключевых кадров. Следующий технический модуль - image-to-video и сборка MP4.</p>
             </div>
             <button className="secondary-button" onClick={() => createProject(brief).then(() => showNotice('Создан новый сценарий'))}>
               <Wand2 size={17} />
@@ -466,7 +513,7 @@ function App() {
                       <Sparkles size={24} />
                     </div>
                   )}
-                  {scene.image_status === 'generating' ? <span className="scene-status">OpenAI</span> : null}
+                  {scene.image_status ? <span className="scene-status">{scene.image_status}</span> : null}
                   <button aria-label="Предпросмотр сцены" onClick={() => setPreviewScene(scene)}>
                     <Play size={18} fill="currentColor" />
                   </button>
@@ -481,11 +528,37 @@ function App() {
           </div>
         </section>
 
+        <section className="pipeline-section">
+          <div className="section-heading">
+            <div>
+              <h2>Производственный пайплайн</h2>
+              <p>Стадии показывают, где сервис уже автоматизирован, а где нужен следующий API-модуль.</p>
+            </div>
+          </div>
+          <div className="stage-list pipeline-list">
+            {stages.map((stage) => (
+              <div className="stage-row" key={stage.slug}>
+                <div className={`stage-dot ${stage.status}`}>
+                  {stage.status === 'done' ? <Check size={13} /> : null}
+                </div>
+                <div className="stage-copy">
+                  <strong>{stage.title}</strong>
+                  <span>{stage.detail}</span>
+                  <div className="progress-track">
+                    <div style={{ width: `${stage.progress}%` }} />
+                  </div>
+                </div>
+                <small>{stage.progress}%</small>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="pricing-section" id="pricing">
           <div className="section-heading">
             <div>
               <h2>Монетизация</h2>
-              <p>Подписка продается как лимит роликов, а не безлимитная генерация.</p>
+              <p>5 000 ₽ можно оставить как входной тариф, но подписку лучше начинать с 9 900 ₽: генерации видео быстро съедают себестоимость.</p>
             </div>
           </div>
           <div className="plan-grid">
@@ -501,26 +574,8 @@ function App() {
         </section>
       </main>
 
-      {previewScene ? (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Предпросмотр сцены">
-          <div className="preview-modal">
-            <button className="modal-close" aria-label="Закрыть предпросмотр" onClick={() => setPreviewScene(null)}>
-              <X size={18} />
-            </button>
-            <div className={`scene-preview modal-preview ${previewScene.gradient}`}>
-              {previewScene.image_url ? (
-                <img src={previewScene.image_url} alt={previewScene.title} />
-              ) : (
-                <div className="scene-character">
-                  <Sparkles size={24} />
-                </div>
-              )}
-            </div>
-            <h2>{previewScene.title}</h2>
-            <p>{previewScene.prompt}</p>
-          </div>
-        </div>
-      ) : null}
+      {previewScene ? <SceneModal scene={previewScene} onClose={() => setPreviewScene(null)} /> : null}
+      {filmPreviewOpen ? <FilmModal scenes={scenes} brief={brief} script={scriptPreview} onClose={() => setFilmPreviewOpen(false)} /> : null}
     </div>
   )
 }
@@ -529,15 +584,11 @@ function createLocalScript(brief: Brief) {
   return `${brief.name} получает волшебный пропуск в ${brief.world} на событие: ${brief.occasion}. Чтобы вернуться домой с подарком для семьи, герой проходит три испытания, учится смелости и в финале устраивает собственную премьеру мультфильма. Тон истории: ${brief.tone}.`
 }
 
-function Panel({
-  title,
-  icon: Icon,
-  children,
-}: {
-  title: string
-  icon: typeof Upload
-  children: React.ReactNode
-}) {
+function createVoiceover(script: string, brief: Brief) {
+  return `Диктор, теплый семейный тон. ${script} Финальная фраза: "${brief.name}, твое главное приключение только начинается".`
+}
+
+function Panel({ title, icon: Icon, children }: { title: string; icon: LucideIcon; children: React.ReactNode }) {
   return (
     <article className="panel">
       <div className="panel-title">
@@ -568,20 +619,84 @@ function Field({
   )
 }
 
-function Metric({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof CalendarClock
-  label: string
-  value: string
-}) {
+function Metric({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
     <div className="metric">
       <Icon size={18} />
       <span>{label}</span>
       <strong>{value}</strong>
+    </div>
+  )
+}
+
+function ActionButton({
+  icon: Icon,
+  title,
+  detail,
+  onClick,
+  disabled = false,
+}: {
+  icon: LucideIcon
+  title: string
+  detail: string
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button className="action-button" onClick={onClick} disabled={disabled}>
+      <Icon size={18} />
+      <span>
+        <strong>{title}</strong>
+        <small>{detail}</small>
+      </span>
+    </button>
+  )
+}
+
+function SceneModal({ scene, onClose }: { scene: Scene; onClose: () => void }) {
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Предпросмотр сцены">
+      <div className="preview-modal">
+        <button className="modal-close" aria-label="Закрыть предпросмотр" onClick={onClose}>
+          <X size={18} />
+        </button>
+        <div className={`scene-preview modal-preview ${scene.gradient}`}>
+          {scene.image_url ? (
+            <img src={scene.image_url} alt={scene.title} />
+          ) : (
+            <div className="scene-character">
+              <Sparkles size={24} />
+            </div>
+          )}
+        </div>
+        <h2>{scene.title}</h2>
+        <p>{scene.prompt}</p>
+      </div>
+    </div>
+  )
+}
+
+function FilmModal({ scenes, brief, script, onClose }: { scenes: Scene[]; brief: Brief; script: string; onClose: () => void }) {
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Черновой аниматик">
+      <div className="film-modal">
+        <button className="modal-close" aria-label="Закрыть аниматик" onClick={onClose}>
+          <X size={18} />
+        </button>
+        <div className="film-screen">
+          {scenes.map((scene, index) => (
+            <div className={`film-frame ${scene.gradient}`} style={{ animationDelay: `${index * 3}s` }} key={`${scene.title}-${index}`}>
+              {scene.image_url ? <img src={scene.image_url} alt={scene.title} /> : <Sparkles size={38} />}
+              <span>{scene.title}</span>
+            </div>
+          ))}
+        </div>
+        <div className="film-copy">
+          <h2>Черновой аниматик: {brief.name}</h2>
+          <p>{script}</p>
+          <small>Это превью показывает порядок сцен. Финальный MP4 появится после подключения image-to-video, озвучки и монтажного модуля.</small>
+        </div>
+      </div>
     </div>
   )
 }
