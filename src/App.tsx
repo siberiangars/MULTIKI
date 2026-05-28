@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import { motion } from 'framer-motion'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -78,6 +79,7 @@ type Project = {
 type NoticeTone = 'info' | 'success' | 'warning' | 'error'
 
 const apiBase = import.meta.env.VITE_API_URL ?? ''
+type PageKey = 'dashboard' | 'orders' | 'new' | 'photos' | 'scripts' | 'frames' | 'animatic' | 'voice' | 'pack' | 'pricing' | 'settings'
 
 const seedBrief: Brief = {
   name: 'Лёва',
@@ -121,17 +123,17 @@ const fallbackScenes: Scene[] = [
 ]
 
 const navigation = [
-  { label: 'Дашборд', icon: Clapperboard, target: 'summary' },
-  { label: 'Заказы', icon: FileText, target: 'summary' },
-  { label: 'Новый мультфильм', icon: Wand2, target: 'brief' },
-  { label: 'Фото', icon: UserRound, target: 'photos' },
-  { label: 'Сценарии', icon: FileJson, target: 'brief' },
-  { label: 'Кадры', icon: ImageIcon, target: 'storyboard' },
-  { label: 'Аниматик', icon: Film, target: 'storyboard' },
-  { label: 'Озвучка', icon: Mic2, target: 'pipeline' },
-  { label: 'Production Pack', icon: Download, target: 'files' },
-  { label: 'Тарифы', icon: CreditCard, target: 'pricing' },
-  { label: 'Настройки', icon: Settings, target: 'summary' },
+  { label: 'Дашборд', icon: Clapperboard, page: 'dashboard' as const },
+  { label: 'Заказы', icon: FileText, page: 'orders' as const },
+  { label: 'Новый мультфильм', icon: Wand2, page: 'new' as const },
+  { label: 'Фото', icon: UserRound, page: 'photos' as const },
+  { label: 'Сценарии', icon: FileJson, page: 'scripts' as const },
+  { label: 'Кадры', icon: ImageIcon, page: 'frames' as const },
+  { label: 'Аниматик', icon: Film, page: 'animatic' as const },
+  { label: 'Озвучка', icon: Mic2, page: 'voice' as const },
+  { label: 'Production Pack', icon: Download, page: 'pack' as const },
+  { label: 'Тарифы', icon: CreditCard, page: 'pricing' as const },
+  { label: 'Настройки', icon: Settings, page: 'settings' as const },
 ]
 
 const plans = [
@@ -148,17 +150,20 @@ function App() {
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([])
   const [previewScene, setPreviewScene] = useState<Scene | null>(null)
   const [filmPreviewOpen, setFilmPreviewOpen] = useState(false)
+  const [activePage, setActivePage] = useState<PageKey>('new')
   const [notice, setNotice] = useState<{ message: string; tone: NoticeTone }>({
     message: 'Готово к работе',
     tone: 'info',
   })
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  const stages = project?.stages ?? fallbackStages
-  const scenes = project?.scenes?.length ? project.scenes : fallbackScenes
+  const displayProject = useMemo(() => normalizeProject(project), [project])
+  const stages = displayProject?.stages ?? fallbackStages
+  const scenes = displayProject?.scenes?.length ? displayProject.scenes : fallbackScenes
   const isGenerating = project?.status === 'queued' || project?.status === 'generating'
   const isFailed = project?.status === 'failed'
-  const scriptPreview = project?.script ?? createLocalScript(brief)
+  const displayBrief = displayProject?.brief ?? normalizeBrief(brief)
+  const scriptPreview = displayProject?.script ?? createLocalScript(displayBrief)
   const readyImages = scenes.filter((scene) => scene.image_url && scene.image_status === 'ready').length
   const readyVideos = scenes.filter((scene) => scene.video_url && scene.video_status === 'ready').length
   const preparedVideos = scenes.filter((scene) => scene.video_status === 'prepared' || scene.video_prompt).length
@@ -195,8 +200,9 @@ function App() {
     window.setTimeout(() => setNotice({ message: 'Готово к работе', tone: 'info' }), 2600)
   }
 
-  function scrollToSection(target: string, label: string) {
-    document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  function openPage(page: PageKey, label: string) {
+    setActivePage(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
     showNotice(`${label}: раздел открыт`)
   }
 
@@ -213,9 +219,9 @@ function App() {
     const payload = {
       projectId: project?.id ?? 'draft',
       status: project?.status ?? 'draft',
-      brief,
+      brief: displayBrief,
       producerScript: scriptPreview,
-      voiceover: createVoiceover(scriptPreview, brief),
+      voiceover: createVoiceover(scriptPreview, displayBrief),
       storyboard: scenes.map((scene, index) => ({
         scene: index + 1,
         title: scene.title,
@@ -226,7 +232,7 @@ function App() {
         videoProvider: 'abacus',
         videoStatus: scene.video_status ?? 'pending',
         videoUrl: scene.video_url ?? null,
-        abacusImageToVideoPrompt: scene.video_prompt ?? createAbacusVideoPrompt(scene.prompt, brief),
+        abacusImageToVideoPrompt: scene.video_prompt ?? createAbacusVideoPrompt(scene.prompt, displayBrief),
         montageNote: `План ${index + 1}: 4-6 секунд, мягкий camera push, переход по музыке.`,
       })),
       deliveryChecklist: [
@@ -374,15 +380,15 @@ function App() {
   return (
     <div className="min-h-screen bg-[#F7F9FC] text-slate-900">
       <AppShell
-        activeTarget="brief"
-        onNavigate={scrollToSection}
+        activePage={activePage}
+        onNavigate={openPage}
         notice={<PrivacyNotice />}
       />
 
       <main className="min-h-screen lg:pl-[280px]">
         <OrderHeader
           apiState={apiState}
-          brief={brief}
+          brief={displayBrief}
           notice={notice}
           orderId={project?.id}
           orderStatus={orderStatus}
@@ -391,88 +397,246 @@ function App() {
           readyImages={readyImages}
         />
 
-        <div className="mx-auto max-w-[1520px] px-4 py-5 sm:px-6 lg:px-8">
-          <ProductionStepper
-            hasGeneratedFrames={hasGeneratedFrames}
-            hasUploadedPhotos={hasUploadedPhotos}
-            isFailed={isFailed}
-            isGenerating={isGenerating}
-            preparedVideos={preparedVideos}
-            readyImages={readyImages}
-            readyVideos={readyVideos}
-          />
-
-          <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_392px]">
-            <div className="min-w-0 space-y-6">
-              <section className="grid grid-cols-1 gap-6 lg:grid-cols-2" id="brief">
-                <PhotoUploadCard
-                  fileInputRef={fileInputRef}
-                  onUpload={handlePhotoUpload}
-                  photos={uploadedPhotos}
-                />
-                <BriefForm
-                  brief={brief}
-                  isSaving={isSaving}
-                  onGenerate={startGeneration}
-                  onRevision={createRevision}
-                  scriptPreview={scriptPreview}
-                  updateBrief={updateBrief}
-                  canGenerate={canGenerate}
-                />
-              </section>
-
-              <StoryboardGrid
-                isFailed={isFailed}
-                isGenerating={isGenerating}
-                onDownload={downloadScene}
-                onOpen={setPreviewScene}
-                onRegenerate={startGeneration}
-                scenes={scenes}
-              />
-
-              <PipelineStatus
-                stages={stages}
-                hasGeneratedFrames={hasGeneratedFrames}
-                preparedVideos={preparedVideos}
-                readyImages={readyImages}
-                readyVideos={readyVideos}
-              />
-
-              <PricingSection />
-            </div>
-
-            <NextActionPanel
-              brief={brief}
-              canGenerate={canGenerate}
-              hasGeneratedFrames={hasGeneratedFrames}
-              isGenerating={isGenerating}
-              onCopyClientLink={copyClientLink}
-              onDownloadPack={downloadProductionPack}
-              onGenerate={startGeneration}
-              onNewScenario={createRevision}
-              onOpenAnimatic={() => setFilmPreviewOpen(true)}
-              orderStatus={orderStatus.label}
-              readyImages={readyImages}
-              scenes={scenes}
-            />
-          </div>
-        </div>
+        <PlatformContent
+          activePage={activePage}
+          brief={displayBrief}
+          canGenerate={canGenerate}
+          fileInputRef={fileInputRef}
+          hasGeneratedFrames={hasGeneratedFrames}
+          hasUploadedPhotos={hasUploadedPhotos}
+          isFailed={isFailed}
+          isGenerating={isGenerating}
+          isSaving={isSaving}
+          onCopyClientLink={copyClientLink}
+          onDownloadPack={downloadProductionPack}
+          onGenerate={startGeneration}
+          onNewScenario={createRevision}
+          onOpenAnimatic={() => setFilmPreviewOpen(true)}
+          onOpenScene={setPreviewScene}
+          onRegenerate={startGeneration}
+          onSceneDownload={downloadScene}
+          onUpload={handlePhotoUpload}
+          orderStatus={orderStatus.label}
+          photos={uploadedPhotos}
+          preparedVideos={preparedVideos}
+          readyImages={readyImages}
+          readyVideos={readyVideos}
+          scenes={scenes}
+          scriptPreview={scriptPreview}
+          stages={stages}
+          updateBrief={updateBrief}
+        />
       </main>
 
       {previewScene ? <SceneModal scene={previewScene} onClose={() => setPreviewScene(null)} /> : null}
-      {filmPreviewOpen ? <FilmModal scenes={scenes} brief={brief} script={scriptPreview} onClose={() => setFilmPreviewOpen(false)} /> : null}
+      {filmPreviewOpen ? <FilmModal scenes={scenes} brief={displayBrief} script={scriptPreview} onClose={() => setFilmPreviewOpen(false)} /> : null}
     </div>
   )
 }
 
+function PlatformContent({
+  activePage,
+  brief,
+  canGenerate,
+  fileInputRef,
+  hasGeneratedFrames,
+  hasUploadedPhotos,
+  isFailed,
+  isGenerating,
+  isSaving,
+  onCopyClientLink,
+  onDownloadPack,
+  onGenerate,
+  onNewScenario,
+  onOpenAnimatic,
+  onOpenScene,
+  onRegenerate,
+  onSceneDownload,
+  onUpload,
+  orderStatus,
+  photos,
+  preparedVideos,
+  readyImages,
+  readyVideos,
+  scenes,
+  scriptPreview,
+  stages,
+  updateBrief,
+}: {
+  activePage: PageKey
+  brief: Brief
+  canGenerate: boolean
+  fileInputRef: RefObject<HTMLInputElement | null>
+  hasGeneratedFrames: boolean
+  hasUploadedPhotos: boolean
+  isFailed: boolean
+  isGenerating: boolean
+  isSaving: boolean
+  onCopyClientLink: () => void
+  onDownloadPack: () => void
+  onGenerate: () => void
+  onNewScenario: () => void
+  onOpenAnimatic: () => void
+  onOpenScene: (scene: Scene) => void
+  onRegenerate: () => void
+  onSceneDownload: (scene: Scene, index: number) => void
+  onUpload: (files: FileList | null) => void
+  orderStatus: string
+  photos: string[]
+  preparedVideos: number
+  readyImages: number
+  readyVideos: number
+  scenes: Scene[]
+  scriptPreview: string
+  stages: Stage[]
+  updateBrief: (field: keyof Brief, value: string) => void
+}) {
+  const shell = (children: ReactNode, aside = true) => (
+    <div className="mx-auto max-w-[1520px] px-4 py-5 sm:px-6 lg:px-8">
+      <div className={clsx('grid grid-cols-1 gap-6', aside && 'xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_392px]')}>
+        <div className="min-w-0 space-y-6">{children}</div>
+        {aside ? (
+          <NextActionPanel
+            brief={brief}
+            canGenerate={canGenerate}
+            hasGeneratedFrames={hasGeneratedFrames}
+            isGenerating={isGenerating}
+            onCopyClientLink={onCopyClientLink}
+            onDownloadPack={onDownloadPack}
+            onGenerate={onGenerate}
+            onNewScenario={onNewScenario}
+            onOpenAnimatic={onOpenAnimatic}
+            orderStatus={orderStatus}
+            readyImages={readyImages}
+            scenes={scenes}
+          />
+        ) : null}
+      </div>
+    </div>
+  )
+
+  if (activePage === 'dashboard') {
+    return shell(
+      <>
+        <PlatformHero title="Дашборд" description="Обзор заказов, готовности материалов и следующих действий по производству." icon={Clapperboard} />
+        <ProductionStepper
+          hasGeneratedFrames={hasGeneratedFrames}
+          hasUploadedPhotos={hasUploadedPhotos}
+          isFailed={isFailed}
+          isGenerating={isGenerating}
+          preparedVideos={preparedVideos}
+          readyImages={readyImages}
+          readyVideos={readyVideos}
+        />
+        <PipelineStatus stages={stages} hasGeneratedFrames={hasGeneratedFrames} preparedVideos={preparedVideos} readyImages={readyImages} readyVideos={readyVideos} />
+      </>,
+    )
+  }
+
+  if (activePage === 'orders') {
+    return shell(
+      <>
+        <PlatformHero title="Заказы" description="Рабочий список заказов. Сейчас активен последний проект, который открыт в шапке." icon={FileText} />
+        <OrdersView brief={brief} orderStatus={orderStatus} readyImages={readyImages} onOpenAnimatic={onOpenAnimatic} />
+      </>,
+    )
+  }
+
+  if (activePage === 'photos') {
+    return shell(<PhotoUploadCard fileInputRef={fileInputRef} onUpload={onUpload} photos={photos} />)
+  }
+
+  if (activePage === 'scripts') {
+    return shell(
+      <BriefForm
+        brief={brief}
+        canGenerate={canGenerate}
+        isSaving={isSaving}
+        onGenerate={onGenerate}
+        onRevision={onNewScenario}
+        scriptPreview={scriptPreview}
+        updateBrief={updateBrief}
+      />,
+    )
+  }
+
+  if (activePage === 'frames') {
+    return shell(
+      <StoryboardGrid
+        isFailed={isFailed}
+        isGenerating={isGenerating}
+        onDownload={onSceneDownload}
+        onOpen={onOpenScene}
+        onRegenerate={onRegenerate}
+        scenes={scenes}
+      />,
+    )
+  }
+
+  if (activePage === 'animatic') {
+    return shell(<AnimaticView brief={brief} scenes={scenes} script={scriptPreview} onOpenAnimatic={onOpenAnimatic} />, false)
+  }
+
+  if (activePage === 'voice') {
+    return shell(<VoiceView />, false)
+  }
+
+  if (activePage === 'pack') {
+    return shell(<PackView scenes={scenes} onDownloadPack={onDownloadPack} />, false)
+  }
+
+  if (activePage === 'pricing') {
+    return shell(<PricingSection />, false)
+  }
+
+  if (activePage === 'settings') {
+    return shell(<SettingsView />, false)
+  }
+
+  return shell(
+    <>
+      <ProductionStepper
+        hasGeneratedFrames={hasGeneratedFrames}
+        hasUploadedPhotos={hasUploadedPhotos}
+        isFailed={isFailed}
+        isGenerating={isGenerating}
+        preparedVideos={preparedVideos}
+        readyImages={readyImages}
+        readyVideos={readyVideos}
+      />
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <PhotoUploadCard fileInputRef={fileInputRef} onUpload={onUpload} photos={photos} />
+        <BriefForm
+          brief={brief}
+          canGenerate={canGenerate}
+          isSaving={isSaving}
+          onGenerate={onGenerate}
+          onRevision={onNewScenario}
+          scriptPreview={scriptPreview}
+          updateBrief={updateBrief}
+        />
+      </section>
+      <StoryboardGrid
+        isFailed={isFailed}
+        isGenerating={isGenerating}
+        onDownload={onSceneDownload}
+        onOpen={onOpenScene}
+        onRegenerate={onRegenerate}
+        scenes={scenes}
+      />
+      <PipelineStatus stages={stages} hasGeneratedFrames={hasGeneratedFrames} preparedVideos={preparedVideos} readyImages={readyImages} readyVideos={readyVideos} />
+    </>,
+  )
+}
+
 function AppShell({
-  activeTarget,
+  activePage,
   notice,
   onNavigate,
 }: {
-  activeTarget: string
-  notice: React.ReactNode
-  onNavigate: (target: string, label: string) => void
+  activePage: PageKey
+  notice: ReactNode
+  onNavigate: (page: PageKey, label: string) => void
 }) {
   return (
     <aside className="hidden fixed inset-y-0 left-0 z-40 w-[280px] border-r border-white/70 bg-white/82 px-5 py-6 shadow-[18px_0_60px_rgba(15,23,42,0.05)] backdrop-blur-xl lg:flex lg:flex-col">
@@ -489,7 +653,7 @@ function AppShell({
       <nav className="mt-8 grid gap-1.5">
         {navigation.map((item) => {
           const Icon = item.icon
-          const active = item.target === activeTarget
+          const active = item.page === activePage
           return (
             <button
               className={clsx(
@@ -499,7 +663,7 @@ function AppShell({
                   : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900',
               )}
               key={item.label}
-              onClick={() => onNavigate(item.target, item.label)}
+              onClick={() => onNavigate(item.page, item.label)}
             >
               <Icon className={clsx('h-4.5 w-4.5', active ? 'text-cyan-600' : 'text-slate-400 group-hover:text-cyan-600')} />
               <span>{item.label}</span>
@@ -1084,6 +1248,133 @@ function PricingSection() {
   )
 }
 
+function PlatformHero({ description, icon: Icon, title }: { description: string; icon: LucideIcon; title: string }) {
+  return (
+    <section className="rounded-[28px] border border-white/80 bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.07)]">
+      <SectionLabel icon={Icon} label="Раздел платформы" />
+      <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">{title}</h2>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{description}</p>
+    </section>
+  )
+}
+
+function OrdersView({
+  brief,
+  onOpenAnimatic,
+  orderStatus,
+  readyImages,
+}: {
+  brief: Brief
+  onOpenAnimatic: () => void
+  orderStatus: string
+  readyImages: number
+}) {
+  return (
+    <section className="rounded-[28px] border border-white/80 bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.07)]">
+      <div className="grid gap-4">
+        <article className="flex flex-col gap-4 rounded-[24px] border border-slate-100 bg-slate-50/70 p-5 md:flex-row md:items-center md:justify-between">
+          <div>
+            <span className="text-xs font-black uppercase tracking-[0.14em] text-cyan-600">Активный заказ</span>
+            <h3 className="mt-2 text-xl font-black text-slate-950">Мультфильм для {brief.name}</h3>
+            <p className="mt-1 text-sm font-semibold text-slate-500">{brief.occasion} · {brief.world}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge label={orderStatus} tone="success" />
+            <StatusBadge label={`${readyImages} из 4 кадров`} tone={readyImages ? 'success' : 'warning'} />
+            <button className="rounded-2xl bg-slate-950 px-4 py-2 text-sm font-black text-white" onClick={onOpenAnimatic}>Открыть</button>
+          </div>
+        </article>
+      </div>
+    </section>
+  )
+}
+
+function AnimaticView({
+  brief,
+  onOpenAnimatic,
+  scenes,
+  script,
+}: {
+  brief: Brief
+  onOpenAnimatic: () => void
+  scenes: Scene[]
+  script: string
+}) {
+  return (
+    <section className="rounded-[28px] border border-white/80 bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.07)]">
+      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="relative aspect-video overflow-hidden rounded-[26px] bg-slate-950">
+          {scenes.map((scene, index) => (
+            <div className={clsx('absolute inset-0 grid place-items-center bg-gradient-to-br opacity-0', scene.gradient || 'from-cyan-100 to-violet-100', 'animate-[filmFrames_12s_infinite]')} style={{ animationDelay: `${index * 3}s` }} key={`${scene.title}-${index}`}>
+              {scene.image_url ? <img className="absolute inset-0 h-full w-full object-cover animate-[kenBurns_3s_ease-in-out_infinite_alternate]" src={scene.image_url} alt={scene.title} /> : <Sparkles className="relative z-10 text-white" size={38} />}
+              <span className="absolute bottom-4 left-4 rounded-2xl bg-slate-950/72 px-3 py-2 text-sm font-black text-white">{scene.title}</span>
+            </div>
+          ))}
+        </div>
+        <div className="self-center">
+          <SectionLabel icon={Film} label="Аниматик" />
+          <h2 className="mt-3 text-3xl font-black text-slate-950">Черновой просмотр: {brief.name}</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">{script}</p>
+          <button className="mt-5 inline-flex h-12 items-center gap-2 rounded-2xl bg-slate-950 px-5 text-sm font-black text-white" onClick={onOpenAnimatic}>
+            <Play size={16} />
+            Открыть в модальном окне
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function VoiceView() {
+  return (
+    <section className="rounded-[28px] border border-white/80 bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.07)]">
+      <SectionLabel icon={Mic2} label="Озвучка" />
+      <h2 className="mt-3 text-3xl font-black text-slate-950">ElevenLabs будет следующим модулем</h2>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+        Здесь появятся выбор голоса, предпрослушивание, паузы, эмоции и генерация дорожки для финального монтажа.
+      </p>
+      <div className="mt-6 rounded-[24px] bg-amber-50 p-5 text-sm font-semibold leading-6 text-amber-800">
+        Сейчас сервис готовит сценарий диктора внутри пакета материалов для монтажа.
+      </div>
+    </section>
+  )
+}
+
+function PackView({ onDownloadPack, scenes }: { onDownloadPack: () => void; scenes: Scene[] }) {
+  return (
+    <section className="rounded-[28px] border border-white/80 bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.07)]">
+      <SectionLabel icon={Download} label="Production Pack" />
+      <h2 className="mt-3 text-3xl font-black text-slate-950">Пакет материалов для монтажа</h2>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+        JSON, изображения, подсказки для генерации видео из изображений и структура сцен.
+      </p>
+      <div className="mt-6 grid gap-3 md:grid-cols-2">
+        <OrderMeta label="Ключевые кадры" value={`${scenes.filter((scene) => scene.image_url).length} из ${scenes.length}`} />
+        <OrderMeta label="Подсказки для видео" value={`${scenes.filter((scene) => scene.video_prompt).length} подготовлено`} />
+      </div>
+      <button className="mt-6 inline-flex h-12 items-center gap-2 rounded-2xl bg-slate-950 px-5 text-sm font-black text-white" onClick={onDownloadPack}>
+        <Download size={16} />
+        Скачать пакет материалов
+      </button>
+    </section>
+  )
+}
+
+function SettingsView() {
+  return (
+    <section className="rounded-[28px] border border-white/80 bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.07)]">
+      <SectionLabel icon={Settings} label="Настройки" />
+      <h2 className="mt-3 text-3xl font-black text-slate-950">Провайдеры генерации</h2>
+      <div className="mt-6 grid gap-3 md:grid-cols-2">
+        <OrderMeta label="Изображения" value="Abacus · nano_banana" />
+        <OrderMeta label="Сценарии" value="Claude / локальный шаблон" />
+        <OrderMeta label="Озвучка" value="ElevenLabs · скоро" />
+        <OrderMeta label="Видео" value="Abacus prompts · manual" />
+      </div>
+    </section>
+  )
+}
+
 function StoryboardSkeleton() {
   return (
     <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4">
@@ -1286,6 +1577,79 @@ function EmptyScene() {
       </div>
     </div>
   )
+}
+
+function normalizeProject(project: Project | null): Project | null {
+  if (!project) return null
+  const normalizedBrief = normalizeBrief(project.brief)
+
+  return {
+    ...project,
+    brief: normalizedBrief,
+    script: cleanText(project.script, createLocalScript(normalizedBrief)),
+    stages: project.stages.map(normalizeStage),
+    scenes: project.scenes.map((scene, index) => normalizeScene(scene, normalizedBrief, index)),
+  }
+}
+
+function normalizeBrief(brief: Brief): Brief {
+  return {
+    name: cleanText(brief.name, seedBrief.name),
+    age: cleanText(brief.age, seedBrief.age),
+    occasion: cleanText(brief.occasion, seedBrief.occasion),
+    world: cleanText(brief.world, seedBrief.world),
+    tone: cleanText(brief.tone, seedBrief.tone),
+    duration: cleanText(brief.duration, seedBrief.duration),
+  }
+}
+
+function normalizeStage(stage: Stage): Stage {
+  const fallback = fallbackStages.find((item) => item.slug === stage.slug)
+
+  return {
+    ...stage,
+    title: cleanText(stage.title, fallback?.title ?? stage.title),
+    detail: cleanText(stage.detail, fallback?.detail ?? stage.detail),
+  }
+}
+
+function normalizeScene(scene: Scene, brief: Brief, index: number): Scene {
+  const fallback = fallbackScenes[index] ?? fallbackScenes[0]
+
+  return {
+    ...scene,
+    title: cleanText(scene.title, fallback.title),
+    prompt: cleanText(scene.prompt, fallback.prompt.replaceAll(seedBrief.name, brief.name || seedBrief.name)),
+    gradient: normalizeGradient(scene.gradient, fallback.gradient),
+    video_prompt: scene.video_prompt ? cleanText(scene.video_prompt, createAbacusVideoPrompt(fallback.prompt, brief)) : scene.video_prompt,
+  }
+}
+
+function normalizeGradient(value: string | undefined, fallback: string) {
+  const gradients: Record<string, string> = {
+    'scene-cyan': 'from-cyan-200 via-sky-100 to-orange-100',
+    'scene-coral': 'from-orange-200 via-rose-100 to-white',
+    'scene-lime': 'from-lime-200 via-cyan-100 to-white',
+    'scene-ink': 'from-slate-900 via-slate-700 to-orange-300',
+  }
+
+  if (!value) return fallback
+  if (value.startsWith('from-')) return value
+  return gradients[value] ?? fallback
+}
+
+function cleanText(value: string | null | undefined, fallback: string) {
+  const text = (value ?? '').trim()
+  return text && !isBrokenText(text) ? text : fallback
+}
+
+function isBrokenText(text: string) {
+  const questionRuns = (text.match(/\?{2,}/g) ?? []).length
+  const replacementCount = (text.match(/\uFFFD/g) ?? []).length
+  const mojibakeMarkers = ['Ð', 'Ñ', 'Р°', 'Рµ', 'Рё', 'Рѕ', 'СЊ', 'СЃ', 'вЂ', 'в‚']
+  const markerHits = mojibakeMarkers.filter((marker) => text.includes(marker)).length
+
+  return questionRuns > 0 || replacementCount > 0 || markerHits >= 2
 }
 
 function createLocalScript(brief: Brief) {
