@@ -24,11 +24,14 @@ services:
       PORT: 4000
       DATABASE_URL: postgresql://multstudio:multstudio_dev_password@postgres:5432/multstudio
       REDIS_URL: redis://redis:6379
+      IMAGE_PROVIDER: ${IMAGE_PROVIDER:-abacus}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_IMAGE_MODEL: ${OPENAI_IMAGE_MODEL:-gpt-image-1.5}
       OPENAI_IMAGE_SIZE: ${OPENAI_IMAGE_SIZE:-1536x1024}
       OPENAI_IMAGE_QUALITY: ${OPENAI_IMAGE_QUALITY:-medium}
       ABACUS_API_KEY: ${ABACUS_API_KEY:-}
+      ABACUS_IMAGE_ENDPOINT: ${ABACUS_IMAGE_ENDPOINT:-https://routellm.abacus.ai/v1/chat/completions}
+      ABACUS_IMAGE_MODEL: ${ABACUS_IMAGE_MODEL:-nano_banana}
       ABACUS_VIDEO_ENDPOINT: ${ABACUS_VIDEO_ENDPOINT:-}
       ABACUS_VIDEO_MODEL: ${ABACUS_VIDEO_MODEL:-kling_ai_v26}
       ABACUS_VIDEO_DURATION: ${ABACUS_VIDEO_DURATION:-5}
@@ -52,11 +55,14 @@ services:
     environment:
       DATABASE_URL: postgresql://multstudio:multstudio_dev_password@postgres:5432/multstudio
       REDIS_URL: redis://redis:6379
+      IMAGE_PROVIDER: ${IMAGE_PROVIDER:-abacus}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_IMAGE_MODEL: ${OPENAI_IMAGE_MODEL:-gpt-image-1.5}
       OPENAI_IMAGE_SIZE: ${OPENAI_IMAGE_SIZE:-1536x1024}
       OPENAI_IMAGE_QUALITY: ${OPENAI_IMAGE_QUALITY:-medium}
       ABACUS_API_KEY: ${ABACUS_API_KEY:-}
+      ABACUS_IMAGE_ENDPOINT: ${ABACUS_IMAGE_ENDPOINT:-https://routellm.abacus.ai/v1/chat/completions}
+      ABACUS_IMAGE_MODEL: ${ABACUS_IMAGE_MODEL:-nano_banana}
       ABACUS_VIDEO_ENDPOINT: ${ABACUS_VIDEO_ENDPOINT:-}
       ABACUS_VIDEO_MODEL: ${ABACUS_VIDEO_MODEL:-kling_ai_v26}
       ABACUS_VIDEO_DURATION: ${ABACUS_VIDEO_DURATION:-5}

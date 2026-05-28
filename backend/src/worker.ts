@@ -4,7 +4,7 @@ import { closeDb, migrate } from './db.js'
 import { connection } from './queue.js'
 import { createImagePrompt, createVideoPrompt, stageTemplates } from './domain.js'
 import { createAbacusVideoJob, hasAbacusApiKey } from './abacus-video.js'
-import { generateImage, hasOpenAIImages } from './openai-images.js'
+import { generateImage, hasImageProvider } from './image-provider.js'
 import {
   getProject,
   listScenesForProject,
@@ -52,7 +52,7 @@ const worker = new Worker(
 )
 
 async function generateSceneFrames(projectId: string) {
-  if (!hasOpenAIImages()) return
+  if (!hasImageProvider()) return
 
   const project = await getProject(projectId)
   if (!project) return
@@ -61,10 +61,10 @@ async function generateSceneFrames(projectId: string) {
 
   for (const scene of scenes) {
     try {
-      await updateSceneImage(scene.id, scene.image_url, 'openai', 'generating')
+      await updateSceneImage(scene.id, scene.image_url, 'configured', 'generating')
       const prompt = createImagePrompt(scene.prompt, project.brief)
-      const imageUrl = await generateImage(prompt)
-      await updateSceneImage(scene.id, imageUrl, 'openai', 'ready')
+      const image = await generateImage(prompt)
+      await updateSceneImage(scene.id, image.url, image.provider, 'ready')
     } catch (error) {
       console.error(`Scene image generation failed for ${scene.id}`, error)
       await updateSceneImage(scene.id, scene.image_url, 'openai', 'failed')

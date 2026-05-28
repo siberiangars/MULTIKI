@@ -56,12 +56,12 @@ export function createScenePlan(brief: Brief) {
 
 export function createImagePrompt(scenePrompt: string, brief: Brief) {
   return [
-    'Premium 3D animated family film keyframe, original non-branded style, warm cinematic lighting.',
-    `Main character: a ${brief.age}-year-old child named ${brief.name}, friendly expressive face, consistent outfit, wholesome family-safe design.`,
+    'Premium 3D animated family film keyframe, original non-branded studio-quality style, warm cinematic lighting, polished character animation look.',
+    `Main character: a ${brief.age}-year-old child named ${brief.name}, friendly expressive face, consistent outfit, wholesome family-safe design, appealing rounded shapes.`,
     `Scene: ${scenePrompt}.`,
     `Story world: ${brief.world}.`,
     `Tone: ${brief.tone}.`,
-    'Composition: 16:9 wide cinematic frame, clear subject, rich background detail, no text, no logos, no watermark.',
+    'Composition: 16:9 wide cinematic frame, clear subject, rich background detail, strong depth, soft global illumination, no text, no logos, no watermark.',
   ].join(' ')
 }
 
